@@ -1,0 +1,265 @@
+#!perl
+
+require 5.000;
+
+###############################################################################
+##                                                                           ##
+##    This is the "imagick.bnp" Perl script of "Build'n'Play" (BnP).         ##
+##                                                                           ##
+##    (The script which knows how to install ImageMagick and PerlMagick.)    ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This script is a complete rewrite of a script initially written        ##
+##    by Ralf S. Engelschall.                                                ##
+##                                                                           ##
+##    Copyright (c) 1996 - 1998 by Ralf S. Engelschall.                      ##
+##    All rights reserved.                                                   ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "imagick.bnp" was developed with support from          ##
+##    O'Reilly Verlag and was first published on the CD-ROM accompanying     ##
+##    the book "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).      ##
+##                                                                           ##
+##    Diese Version von "imagick.bnp" entstand mit Unterstuetzung des        ##
+##    O'Reilly  Verlag und wurde erstmalig auf der CD-ROM zum Buch "Pro-     ##
+##    grammieren mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.   ##
+##                                                                           ##
+###############################################################################
+
+package BnP::imagick;
+
+BEGIN { unshift(@INC, pop(@ARGV)); }
+
+use BnP;
+
+##
+## Note that we cannot use any other "use" here at all, because in most
+## cases, this will require the "Exporter" module, which miniperl (used
+## for bootstrapping) does not provide (nor any other module)!
+##
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# What are the URLs of your favourite (= fastest)
+# mirror sites? The URLs will be tried in the given
+# order, from top to bottom.
+#
+@URL =
+(
+    'ftp://ftp.wizards.dupont.com/pub/ImageMagick',
+    'ftp://ftp.uu.net/graphics/jpeg',
+    'ftp://ftp.sgi.com/graphics/tiff',
+    'ftp://ftp.uu.net/graphics/png/src',
+    'ftp://ftp.gimp.org/pub/gimp/libs',
+    'ftp://ftp.funet.fi/pub/languages/perl/CPAN',
+    'http://www.perl.com/CPAN',
+    'ftp://ftp.engelschall.com/pub/bnp/packages'
+);
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+$VERSION = "2.1.0 (09-Nov-1998)";  ##  no 'my' for MakeMaker!
+
+##
+## Fetch our remaining private parameters:
+##
+
+my $Path = pop(@ARGV);
+my $Stub = pop(@ARGV);
+my $Site = pop(@ARGV);
+my $Perl = pop(@ARGV);
+
+##
+## Declaration of global variables:
+##
+
+my $SourceDir;
+my $Compiler;
+my $Prefix;
+my $BnP;
+
+##
+## Check some basic requirements:
+##
+
+&indispensable
+(
+    'cp',
+    'mv',
+    'sh',
+    'tar',
+    'true',
+    'make',
+#   'strip',
+    'ranlib',
+    'gunzip'
+);
+
+##
+## Main:
+##
+
+if ($Perl =~ /\bminiperl$/)
+{
+    alert "Can't install '$ARGV[0]' using only 'miniperl',";
+    fatal "you need to 'build perl' first!";
+}
+else
+{
+    alert "Installing all Perl modules to the Perl 5 installation tree";
+    alert "belonging to the Perl binary '$Perl'...";
+}
+
+# =========================================================================== #
+
+$BnP = BnP->new( @ARGV );
+
+$Prefix = $BnP->prefix();
+
+$SourceDir = $BnP->homedir() . "/src";
+
+# =========================================================================== #
+
+$BnP->begin();
+
+$BnP->path( $Path );
+
+$BnP->stub( $Stub );
+
+$BnP->url( $Site, @URL );
+
+chomp($Compiler = `"$Perl" -e 'use Config; print \$Config{"cc"}, "\\n"'`);
+
+# =========================================================================== #
+
+#
+#   fetch distributions
+#
+# $BnP->fetch('ImageMagick-4.1.0.tar.gz', '', $SourceDir);
+# decode.c: In function `ReadLABELImage':
+# decode.c:5068: structure has no member named `num_CharMaps'
+# decode.c:5080: structure has no member named `num_CharMaps'
+#
+$BnP->fetch('ImageMagick-4.0.5.tar.gz', '', $SourceDir);
+$BnP->fetch('jpegsrc.v6b.tar.gz', '', $SourceDir);
+$BnP->fetch('tiff-v3.4beta037-tar.gz', '', $SourceDir);
+$BnP->fetch('libpng-1.0.2.tar.gz', '', $SourceDir);
+$BnP->fetch('zlib-1.1.2.tar.gz', '', $SourceDir);
+$BnP->fetch('freetype-1.0.full.tar.gz', '----', $SourceDir);
+
+#
+#   unpack distributions
+#
+$BnP->system("gunzip -c '$SourceDir/ImageMagick-4.0.5.tar.gz' | tar xf -");
+$BnP->chdir("ImageMagick-4.0.5");
+$BnP->system("gunzip -c '$SourceDir/jpegsrc.v6b.tar.gz' | tar xf -");
+$BnP->system("mv jpeg-6b jpeg");
+$BnP->system("gunzip -c '$SourceDir/tiff-v3.4beta037-tar.gz' | tar xf -");
+$BnP->system("mv tiff-v3.4beta037 tiff");
+$BnP->system("gunzip -c '$SourceDir/libpng-1.0.2.tar.gz' | tar xf -");
+$BnP->system("mv libpng-1.0.2 png");
+$BnP->system("gunzip -c '$SourceDir/zlib-1.1.2.tar.gz' | tar xf -");
+$BnP->system("mv zlib-1.1.2 zlib");
+$BnP->system("gunzip -c '$SourceDir/freetype-1.0.full.tar.gz' | tar xf -");
+$BnP->system("mv freetype-1.0 ttf");
+
+#
+#   make distributions
+#
+$BnP->chdir("jpeg");
+$BnP->system("./configure CC=\"$Compiler\" -with-maxmem=7");
+$BnP->system("make");
+$BnP->back();
+
+$BnP->chdir("tiff");
+$BnP->system("echo 'yes' | ./configure");
+$BnP->system("cd libtiff; make libtiff.a CC=\"$Compiler\"");
+$BnP->back();
+
+$BnP->chdir("zlib");
+$BnP->system("make libz.a CC=\"$Compiler\"");
+$BnP->back();
+
+$BnP->chdir("png");
+$BnP->system("make -f scripts/makefile.std libpng.a CC=\"$Compiler\"");
+$BnP->system("ranlib libpng.a");
+$BnP->back();
+
+$BnP->chdir("ttf");
+$BnP->system("CC=\"$Compiler\" ./configure --disable-nls");
+$BnP->system("make");
+$BnP->system("cp -p lib/.libs/*.a lib/");
+$BnP->back();
+
+$BnP->system("CC=\"$Compiler\" ./configure",
+    "--prefix=\"$Prefix\"",
+    "--enable-shared",
+    "--enable-lzw",
+    "--with-perl");
+$BnP->system("make");
+
+#
+#   install base stuff
+#
+$BnP->system("make install");
+#$BnP->system("cp -p jpeg/libjpeg.a '$Prefix/lib/'");
+#$BnP->system("cp -p png/libpng.a '$Prefix/lib/'");
+#$BnP->system("cp -p tiff/libtiff/libtiff.a '$Prefix/lib/'");
+#$BnP->system("cp -p zlib/libz.a '$Prefix/lib/'");
+
+#
+#   build Perl interface
+#
+$BnP->chdir("PerlMagick");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+$BnP->back(2);
+
+#
+#   cleanup
+#
+#$BnP->system("strip '$Prefix'/bin/* || true"); # avoid errors on scripts
+
+my $genopt =
+    find('genopt', join(':', $ENV{'PATH'}, map(($_,"$_/BnP"), $BnP->path())));
+
+if ($genopt ne '')
+{
+    $Perl = expand($Perl);
+    if ($Perl =~
+        m!^(.+)/(packages(?:/[^/]+)*/perl[^/]*)/bin/perl(?:5(?:\.\d+)?)?$!)
+    {
+        $Prefix = $1; $Perl = $2;
+        $BnP->system("'$genopt' -p '$Prefix' -dbin,man '$Prefix/$Perl'");
+    }
+}
+
+# =========================================================================== #
+
+$BnP->end();
+
+# =========================================================================== #
+
+__END__
+

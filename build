@@ -1,0 +1,1207 @@
+#!/bin/sh
+
+###############################################################################
+##                                                                           ##
+##    This is the "build" command of "Build'n'Play" (BnP).                   ##
+##                                                                           ##
+##    (Roughly, BnP's equivalent of the "make" command.)                     ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This tool is based on an idea developed together with                  ##
+##    Ralf S. Engelschall.                                                   ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "build" was developed with support from O'Reilly       ##
+##    Verlag and was first published on the CD-ROM accompanying the book     ##
+##    "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).               ##
+##                                                                           ##
+##    Diese Version von "build" entstand mit Unterstuetzung des O'Reilly     ##
+##    Verlag und wurde erstmalig auf der CD-ROM zum Buch "Programmieren      ##
+##    mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.              ##
+##                                                                           ##
+###############################################################################
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# Enable or disable informational messages (use an empty string
+# to disable, a non-empty string to enable; initial setting is
+# "verbose=yes"):
+#
+verbose=yes
+
+# What is the default installation prefix, i.e., the root directory
+# of the installation directory tree structure where all the software
+# packages are going to be installed? Must be given as an ABSOLUTE path.
+# (E.g. "default_prefix=/usr/local", "default_prefix=/opt".)
+#
+default_prefix=/usr/local
+
+#/////////////////////////////////////////////////////////////////////////
+#//                                                                     //
+#//    Don't forget to include the directories "$default_prefix/bin"    //
+#//    and "$default_prefix/man" into your "$PATH" and "$MANPATH"       //
+#//    environment variables, respectively, where necessary!            //
+#//                                                                     //
+#/////////////////////////////////////////////////////////////////////////
+
+# Specify here wether to use the "standard" Unix installation approach,
+# or a special directory structure which uses a symbolic link access layer
+# and which allows the complete de-installation of every software package
+# with absolutely no residues whatsoever. This special directory tree
+# structure is maintained automatically by the tool "genopt" (which is
+# also included in the "BnP" distribution). (Use "default_use_genopt=yes"
+# to enable and any other value to disable.)
+#
+default_use_genopt=no
+
+# Whenever the "genopt" installation method is enabled, what is the
+# RELATIVE path of the BnP package? (Relative paths are used for
+# organizing the installed software packages into categories.)
+# Usually this is just "BnP_path=""".
+# Another example is "BnP_path=system/tools".
+#
+BnP_path=""
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+self="build"
+
+genopt="genopt"
+
+version="2.1.0 (09-Nov-1998)"
+
+header="This is \"$self\" of \"Build'n'Play\" (BnP) version $version"
+
+##
+## Internal configuration constants:
+##
+
+internal_targets="clean bnp"
+external_targets="perl tools sfio gimp imagick"
+legal_targets="$internal_targets $external_targets"
+#
+# More targets (such as gcc, apache, tex, ...) will be available soon!
+
+subdirs_perl="info,lib,man"
+subdirs_tools="include,info,lib,man"
+subdirs_sfio="include,lib,man"
+subdirs_gimp="include,lib,man"
+subdirs_imagick="include,lib,man"
+#
+# (The "genopt" subdirectories for each target. The subdirectories
+# "arc" and "bin" need not be specified, they are created by default.)
+
+error_log=".$genopt.errors"
+physical_dir="packages"
+logical_dir="pkg"
+library_dir="lib"
+#
+# (Should be kept in sync with the configuration in "genopt"!)
+
+perl_version="perl5.004_04"
+#
+# (Note that this is NOT the version of Perl 5 that will eventually
+# get installed; this version is used for bootstrapping Perl ONLY!)
+
+downloader="snarf lynx"
+#
+# (Tools for automatic download)
+
+download_snarf='snarf "$path" "$file"'
+download_lynx='lynx -source "$path" >"$file"'
+#
+# (Actual commands for automatic download)
+
+default_sites="ftp://ftp.funet.fi/pub/languages/perl/CPAN \
+http://www.perl.com/CPAN"
+#
+# (URLs for automatic download)
+
+default_stubs="CPAN BnP/src BnP src"
+#
+# (Directory path fragments for automatic in-depth search)
+
+##
+## Initialization of other constants:
+##
+
+TEMPORARY_FILES="/tmp/$self.$$"
+
+INTERCEPT="echo '' >&2; echo '***BREAK' >&2; quit 1"
+
+##
+## Subroutine definitions:
+##
+
+stdout ()
+{
+    if [ "x$verbose" != "x" ]
+    then
+        echo "$self:   $@"
+    fi
+}
+
+stderr ()
+{
+    echo "$self: ! $@" >&2
+}
+
+quit ()
+{
+    rm -f "$TEMPORARY_FILES."* 2>/dev/null
+    exit $1
+}
+
+perform ()
+{
+    "$@"
+    if [ $? -ne 0 ]
+    then
+        stderr "Command '$@' failed!"
+        quit 1
+    fi
+}
+
+critical ()
+{
+    "$@"
+    if [ $? -ne 0 ]
+    then
+        exit 1
+    fi
+}
+
+print_usage ()
+{
+    if [ "x$default_use_genopt" = "xyes" ]
+    then
+        defg="                   (default)"
+        defn=""
+    else
+        defg=""
+        defn="                   (default)"
+    fi
+    #
+    fill="`echo \"$internal_targets\" | sed -e 's|.| |g'`"
+    text_int="`echo \
+'                                                              (built-in)' | \
+      sed -e \"s|^${fill}|${internal_targets}|\"`"
+    #
+    fill="`echo \"$external_targets\" | sed -e 's|.| |g'`"
+    text_ext="`echo \
+'                                                              (external)' | \
+      sed -e \"s|^${fill}|${external_targets}|\"`"
+    #
+    cat << VERBATIM
+
+$header
+
+    Usage:   $self [<options>] <targets>
+
+where <options> is one or more of:
+
+    -p path  -  prefix of the installation hierarchy (e.g. /usr/local, /opt)
+                default: "$default_prefix"
+    -r path  -  optional relative path (category) for target  (implies "-g")
+    -s path  -  additional search path(s) for source files
+    -u url   -  additional URL(s) for automatic download
+    -g       -  use "$genopt" installation method${defg}
+    -n       -  use "normal" installation method${defn}
+    -v       -  print version information and exit
+    -h       -  print this help screen and exit
+
+and <targets> is one or more of (subtargets may be appended using "."):
+
+    $text_int
+    $text_ext
+
+VERBATIM
+}
+
+absolute ()
+{
+    case "$1" in
+      /*) path="$1" ;;
+      *)  path="`pwd`/$1" ;;
+    esac
+}
+
+normalize ()
+{
+    path="$1"
+    case "$path" in
+      /*) flag="/" ;;
+      *)  flag=""  ;;
+    esac
+    trim="/`echo \"$path\" | sed -e \
+        's|///*|/|g; \
+         s|/\./\(\./\)*|/|g; \
+         s|^\./||; \
+         s|/\.$||; \
+         s|^/||; \
+         s|/$||; \
+         s|^\.$||'`/"
+    path=""
+    while [ "x$trim" != "x$path" ]
+    do
+        path="$trim"
+        trim="`echo \"$path\" | sed -e \
+            's|/\.*[^\./][^/]*/\.\./|/|g; s|/\.\.\.\.*/\.\./|/|g'`"
+    done
+    trim="`echo \"$trim\" | sed -e 's|^/||; s|/$||'`"
+    path="$flag$trim"
+}
+
+make_dir ()
+{
+    normalize "$1"
+    if [ ! -d "$path" ]  #  SunOS's sh/test doesn't know -e!
+    then
+        if [ -f "$path" ]
+        then
+            stderr "Can't 'mkdir $path': File already exists!"
+            quit 1
+        fi
+        dir="$flag"
+        path="$trim"
+        while [ "x$path" != "x" ]
+        do
+            item="`echo \"$path\" | sed -e  's|/.*$||'`"
+            path="`echo \"$path\" | sed -ne 's|^[^/]*/||p'`"
+            #
+            dir="$dir$item"
+            if [ ! -d "$dir" ]
+            then
+                perform mkdir "$dir"
+            fi
+            dir="$dir/"
+        done
+    fi
+}
+
+make_copy ()
+{
+    if [ $# -gt 4 ]
+    then
+        perform cp -p "$1/$2" "$3/$4"
+        perform chmod "$5"    "$3/$4"
+    else
+        perform cp -p "$1/$2" "$3"
+        perform chmod "$4"    "$3/$2"
+    fi
+}
+
+probe_s ()
+{
+    file="$TEMPORARY_FILES.test"
+    cat >"$file" <<VERBATIM
+#!/bin/sh
+if [ -s /bin/sh ]
+then
+    exit 0
+fi
+exit 1
+VERBATIM
+    if /bin/sh "$file" 2>/dev/null
+    then
+        test_s=-s
+    else
+        test_s=-r
+    fi
+    rm -f "$file"
+}
+
+probe_x ()
+{
+    file="$TEMPORARY_FILES.test"
+    cat >"$file" <<VERBATIM
+#!/bin/sh
+if [ -x / ] || [ -x /bin ] || [ -x /bin/sh ]
+then
+    exit 0
+fi
+exit 1
+VERBATIM
+    if /bin/sh "$file" 2>/dev/null
+    then
+        test_x=-x
+    else
+        test_x=-r
+    fi
+    rm -f "$file"
+}
+
+find_file ()
+{
+    item="$1"
+    list="$2"
+    mode="$3"
+    spec="$4"
+    path="`echo \"$list\" | sed -e 's|:::*|:.:|g; s|^:|.:|; s|:$|:.|'`"
+    while [ "x$path" != "x" ]
+    do
+        dir="`echo  \"$path\" | sed -e  's|:.*$||; s|//*|/|g; s|/$||'`"
+        path="`echo \"$path\" | sed -ne 's|^[^:]*:||p'`"
+        #
+        file="$dir/$item"
+        if [ -f "$file" -a -r "$file" -a $test_s "$file" ]
+        then
+            return 0
+        fi
+    done
+    if [ "x$mode" = "x" ]
+    then
+        stderr "Can't find '$item' in '$list'!"
+        quit 1
+    else
+        if [ "x$mode" = "xnice" ]
+        then
+            return 1
+        else
+            path="$search"
+            while [ "x$path" != "x" ]
+            do
+                base="`echo \"$path\" | sed -e  's|:.*$||; s|//*|/|g; s|/$||'`"
+                path="`echo \"$path\" | sed -ne 's|^[^:]*:||p'`"
+                #
+                for stub in "" $default_stubs
+                do
+                    for part in "" $spec
+                    do
+                        dir="`echo \"$base/$stub/$part\" | \
+                            sed -e 's|//*|/|g; s|/$||'`"
+                        file="$dir/$item"
+                        if [ -f "$file" -a -r "$file" -a $test_s "$file" ]
+                        then
+                            return 0
+                        fi
+                    done
+                done
+            done
+            if [ "x$mode" = "xdeep" ]
+            then
+                stderr "Can't find '$item' neither in '$list'"
+                stderr "nor in '$search'"
+                if [ "x$spec" = "x" ]
+                then
+                    stderr "using offsets '$default_stubs'!"
+                else
+                    stderr "using offsets '$default_stubs' and '$spec'!"
+                fi
+                quit 1
+            else
+                return 1
+            fi
+        fi
+    fi
+}
+
+fetch ()
+{
+    name="$1"
+    zone="$2"
+    pool="$3"
+    find_file "$name" "$pool" "deep+nice" "$zone"
+    if [ $? -ne 0 ]
+    then
+        found=""
+        for tool in $downloader
+        do
+            if find_file "$tool" "$PATH" "nice"
+            then
+                found=yes
+                break
+            fi
+        done
+        if [ "x$found" = "x" ]
+        then
+            stderr "Can't find any tool ($downloader) for downloading!"
+            return 1
+        else
+            stdout "Downloading '$name' with '$tool'..."
+            eval "download=\"\$download_${tool}\""
+            found=""
+            for base in $sites $default_sites
+            do
+                path="$base/$zone/$name"
+                file="$pool/$name"
+                dir="$pool"
+                stdout "Trying '$path'..."
+                ( eval "$download" ) >/dev/null 2>/dev/null
+                if [ $? -eq 0 ]
+                then
+                    if [ -f "$file" -a -r "$file" ]
+                    then
+                        total="`cat \"$file\" | wc -c`"
+                        if [ $total -gt 0 ]
+                        then
+                            other="`cat \"$file\" | tr -d '\012\040-\176' | \
+                                wc -c`"
+                            ratio="`expr $other \* 100 / $total`"
+                            if [ $ratio -gt 30 ]
+                            then
+                                found=yes
+                                break
+                            fi
+                        fi
+                    fi
+                fi
+                perform rm -f "$file"
+            done
+            if [ "x$found" = "x" ]
+            then
+                stderr "Download of '$name' with '$tool' failed!"
+                return 1
+            fi
+        fi
+    fi
+    return 0
+}
+
+check_prefix ()
+{
+    case "$1" in
+      /*) # absolute path
+          ;;
+      *)  # relative path
+          print_usage
+          stderr "The installation prefix '$1' must be absolute!"
+          quit 1
+          ;;
+    esac
+}
+
+add_path ()
+{
+    new="$1"
+    if [ "x$new" != "x" ]
+    then
+        if [ "x$search" = "x" ]
+        then
+            search="$new"
+        else
+            flag=""
+            rest="$search"
+            while [ "x$rest" != "x" ]
+            do
+                old="`echo \"$rest\" | sed -e  's|:.*$||'`"
+                if [ "x$new" = "x$old" ]
+                then
+                    flag=yes
+                    break
+                fi
+                rest="`echo \"$rest\" | sed -ne 's|^[^:]*:||p'`"
+            done
+            if [ "x$flag" = "x" ]
+            then
+                search="$search:$new"
+            fi
+        fi
+    fi
+}
+
+check_path ()
+{
+    list="`echo \"$1\" | sed -e 's|:::*|:|g; s|^:||; s|:$||'`"
+    while [ "x$list" != "x" ]
+    do
+        path="`echo \"$list\" | sed -e  's|:.*$||; s|//*|/|g; s|/$||'`"
+        list="`echo \"$list\" | sed -ne 's|^[^:]*:||p'`"
+        absolute "$path"
+        normalize "$path"
+        #
+        # Remove the complete stubs from the right end of "path" if possible:
+        #
+        found=""
+        for stub in $default_stubs
+        do
+            item="`echo \"$path\" | sed -ne \"s|/${stub}\$||p\"`"
+            if [ "x$item" != "x" ]
+            then
+                found=yes
+                add_path "$item"
+                # no "break" here!
+            fi
+        done
+        if [ "x$found" = "x" ]
+        then
+            add_path "$path"
+            #
+            # Try to remove partial stubs from right end of "path" instead:
+            #
+            for stub in $default_stubs
+            do
+                part="`echo \"$stub\" | sed -ne 's|/[^/]*$||p'`"
+                while [ "x$part" != "x" ]
+                do
+                    item="`echo \"$path\" | sed -ne \"s|/${part}\$||p\"`"
+                    if [ "x$item" != "x" ]
+                    then
+                        add_path "$item"
+                        break
+                    fi
+                    part="`echo \"$part\" | sed -ne 's|/[^/]*$||p'`"
+                done
+            done
+        fi
+    done
+}
+
+check_url ()
+{
+    for item in $1
+    do
+        path="`echo \"$item\" | sed -e 's|//*$||'`"
+        if [ "x$sites" = "x" ]
+        then
+            sites="$path"
+        else
+            sites="$sites $path"
+        fi
+    done
+}
+
+check_targets ()
+{
+    target_count=0
+    while [ $# -ne 0 ]
+    do
+        found=""
+        target="`echo \"$1\" | \
+            sed -e 's|  *||g; s|\.\.*|.|g; s|^\.||; s|\.$||; s|\..*$||'`"
+        for ref in $legal_targets
+        do
+            if [ "x$target" = "x$ref" ]
+            then
+                found=yes
+                for ext in $external_targets
+                do
+                    if [ "x$target" = "x$ext" ]
+                    then
+                        target_count="`expr $target_count + 1`"
+                        break
+                    fi
+                done
+                break
+            fi
+        done
+        if [ "x$found" = "x" ]
+        then
+            print_usage
+            stderr "Illegal target '$target' encountered!"
+            quit 1
+        fi
+        shift
+    done
+}
+
+install_bnp ()
+{
+    #
+    # Archivate the BnP files for backup and further reference:
+    #
+    make_copy "$origin" "BnP.pm"      "$BnP_arc" "444"
+    make_copy "$origin" "$self"       "$BnP_arc" "555"
+    make_copy "$origin" "$self.pod"   "$BnP_arc" "444"
+    make_copy "$origin" "$genopt"     "$BnP_arc" "555"
+    make_copy "$origin" "$genopt.pod" "$BnP_arc" "444"
+    make_copy "$origin" "$genopt.txt" "$BnP_arc" "444"
+    #
+    # Install the library:
+    #
+    make_copy "$origin" "BnP.pm"      "$BnP_lib" "444"
+    #
+    # Install the executables:
+    #
+    make_copy "$origin" "$self"       "$BnP_bin" "555"
+    make_copy "$origin" "$genopt"     "$BnP_bin" "555"
+    #
+    # Install and archivate the installation scripts:
+    #
+    for item in $external_targets
+    do
+        make_copy "$origin" "$item.bnp" "$BnP_arc" "444"
+        make_copy "$origin" "$item.bnp" "$BnP_lib/$item" "644"
+    done
+}
+
+make_man ()
+{
+    perform "$perl" "$pod2man" --section=1 \
+        --center="Build'n'Play" --release="$version" "$1" >"$2"
+    if [ -f "$2" -a -r "$2" -a $test_s "$2" ]
+    then
+        perform chmod 444 "$2"
+    else
+        perform rm -f "$2"
+        stderr "Can't make manual page '$2'!"
+        quit 1
+    fi
+}
+
+install_man ()
+{
+    #
+    # Create the necessary subdirectories:
+    #
+    BnP_man1="$BnP_man/man1"
+    BnP_man3="$BnP_man/man3"
+    BnP_cat3="$BnP_man/cat3"
+    #
+    make_dir "$BnP_man1"
+    make_dir "$BnP_man3"
+    make_dir "$BnP_cat3"
+    #
+    # Generate and install the manual pages:
+    #
+    make_man  "$origin/BnP.pm"        "$BnP_man3/BnP.3"
+    #
+    make_man  "$origin/$self.pod"     "$BnP_man1/$self.1"
+    #
+    make_man  "$origin/$genopt.pod"   "$BnP_man1/$genopt.1"
+    #
+    make_copy "$origin" "$genopt.txt" "$BnP_cat3" "$genopt.3" "444"
+}
+
+find_genopt ()
+{
+    find_file "$genopt" "$BnP_bin" "deep"
+    agent="$file"
+    perform rm -f "$prefix/$error_log"
+}
+
+call_genopt ()
+{
+    trap ':' 2
+    /bin/sh "$agent" -p "$prefix" -s "$physical_dir" "$@" >/dev/null
+    if [ $? -ne 0 ]
+    then
+        stderr "Command '$genopt -p $prefix -s $physical_dir $@' failed!"
+        quit 1
+    fi
+    trap "$INTERCEPT" 2
+}
+
+##
+## Remove all temporary files in case of CTRL-C (user interrupt):
+##
+
+trap "$INTERCEPT" 2
+
+##
+## Determine origin directory path and initialize search path:
+##
+
+path="`dirname \"$0\"`"
+absolute "$path"
+normalize "$path"
+origin="$path"
+
+search=""
+check_path "$origin"
+
+##
+## Process the command line options and issue a usage where necessary:
+##
+
+use_genopt="$default_use_genopt"
+prefix="$default_prefix"
+category=""
+sites=""
+
+if [ $# -eq 0 ]
+then
+    print_usage
+    quit 1
+else
+    while [ $# -ne 0 ]
+    do
+        case "$1" in
+          -p*)
+              prefix="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$prefix" = "x" -a $# -gt 0 ]
+              then
+                  prefix="$1"
+                  shift
+              fi
+              if [ "x$prefix" = "x" ]
+              then
+                  print_usage
+                  stderr "Argument for option '-p' is missing or empty!"
+                  quit 1
+              else
+                  check_prefix "$prefix"
+              fi
+              ;;
+          -r*)
+              category="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$category" = "x" -a $# -gt 0 ]
+              then
+                  category="$1"
+                  shift
+              fi
+              if [ "x$category" = "x" ]
+              then
+                  print_usage
+                  stderr "Argument for option '-r' is missing or empty!"
+                  quit 1
+              fi
+              ;;
+          -s*)
+              path="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$path" = "x" -a $# -gt 0 ]
+              then
+                  path="$1"
+                  shift
+              fi
+              if [ "x$path" = "x" ]
+              then
+                  print_usage
+                  stderr "Argument for option '-s' is missing or empty!"
+                  quit 1
+              else
+                  check_path "$path"
+              fi
+              ;;
+          -u*)
+              url="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$url" = "x" -a $# -gt 0 ]
+              then
+                  url="$1"
+                  shift
+              fi
+              if [ "x$url" = "x" ]
+              then
+                  print_usage
+                  stderr "Argument for option '-u' is missing or empty!"
+                  quit 1
+              else
+                  check_url "$url"
+              fi
+              ;;
+          -g)
+              use_genopt=yes
+              shift
+              ;;
+          -n)
+              use_genopt=no
+              shift
+              ;;
+          -v)
+              echo "$header"
+              quit 1
+              ;;
+          -h)
+              print_usage
+              quit 1
+              ;;
+          --)
+              shift
+              break
+              ;;
+          -*)
+              print_usage
+              stderr "Illegal option '$1' encountered!"
+              quit 1
+              ;;
+          *)
+              break
+              ;;
+        esac
+    done
+fi
+
+##
+## Some more checks:
+##
+
+if [ $# -eq 0 ]
+then
+    print_usage
+    stderr "No targets specified!"
+    quit 1
+fi
+
+check_targets "$@"
+
+##
+## Normalize path parameters:
+##
+
+normalize "$prefix"
+prefix="$path"
+
+normalize "$category"
+category="$trim"
+
+##
+## Check consistency and confirm user parameters:
+##
+
+if [ "x$category" = "x" ]
+then
+    stdout "$header"
+    if [ "x$use_genopt" = "xyes" ]
+    then
+        stdout "Using '$genopt' with prefix '$prefix'..."
+    else
+        stdout "Using prefix '$prefix'..."
+    fi
+else
+    use_genopt=yes
+    if [ "$target_count" -eq 0 ]
+    then
+        print_usage
+        stderr "No external target specified for category '$category'!"
+        quit 1
+    elif [ "$target_count" -eq 1 ]
+    then
+        stdout "$header"
+        stdout \
+            "Using '$genopt' with prefix '$prefix' and category '$category'..."
+        category="$category/"
+    else
+        print_usage
+        stderr \
+          "More than one external target specified for category '$category'!"
+        quit 1
+    fi
+fi
+
+##
+## Add some "last resort" items to the search path:
+##
+
+check_path "/cdrom"
+check_path "/cdrec"
+check_path "."
+
+##
+## Check wether "test" supports the "-s" and "-x" tests:
+##
+
+probe_s
+probe_x
+
+##
+## Check all relevant directories (and create them if necessary):
+##
+
+stdout "Checking (creating if necessary) the installation directory tree..."
+
+make_dir "$prefix"
+
+##
+## Create the basic structure of the installation directory tree,
+## including the subtree for the BnP package itself:
+##
+
+if [ "x$use_genopt" = "xyes" ]
+then
+    #
+    # Generate the names of the installation directories:
+    #
+    normalize "$BnP_path"
+    if [ "x$trim" != "x" ]; then trim="$trim/"; fi
+    #
+    BnP_physical="$prefix/$physical_dir/${trim}BnP"
+    BnP_logical="$prefix/$logical_dir/BnP"
+    BnP_lib="$prefix/$library_dir/BnP"
+    #
+    # Create the subdirectory shorthands for all further references:
+    #
+    BnP_arc="$BnP_logical/arc"
+    BnP_bin="$BnP_logical/bin"
+    BnP_man="$BnP_logical/man"
+    #
+    # Find the "genopt" tool and initialize its options:
+    #
+    find_genopt
+    #
+    # Create the directory subtree for the BnP package (this automatically
+    # creates the whole "genopt" directory structure itself, too):
+    # (Note that the subdirectories "arc" and "bin" are created by default.)
+    #
+    call_genopt -c -dlib,man "$BnP_physical"
+    #
+    # Update the search path for this process (and its subprocesses):
+    #
+    PATH="$prefix/$logical_dir/perl/bin:$prefix/bin:$PATH"
+    export PATH
+else
+    #
+    # Create the directories for the simpler case (e.g. "/usr/local"):
+    #
+    BnP_physical="$prefix/lib/BnP"
+    BnP_logical="$prefix/lib/BnP"
+    #
+    BnP_arc="$BnP_logical/arc"
+    BnP_bin="$prefix/bin"
+    BnP_lib="$BnP_logical/lib"
+    BnP_man="$prefix/man"
+    #
+    make_dir "$BnP_arc"
+    make_dir "$BnP_bin"
+    make_dir "$BnP_lib"
+    make_dir "$BnP_man"
+    #
+    # Update the search path for this process (and its subprocesses):
+    #
+    PATH="$prefix/bin:$PATH"
+    export PATH
+fi
+
+##
+## And create the special subdirectories for our workspace and target sources:
+##
+
+BnP_tmp="$BnP_logical/tmp"
+make_dir "$BnP_tmp"
+
+for item in $external_targets
+do
+    make_dir "$BnP_lib/$item/src"
+done
+
+##
+## Bootstrap Perl:
+##
+
+stdout "Searching for a Perl 5 executable..."
+
+perl=""
+perl_name=""
+perl_rating=0
+path="`echo \"$BnP_lib:$PATH\" | sed -e 's|:::*|:.:|g; s|^:|.:|; s|:$|:.|'`"
+while [ "x$path" != "x" ]
+do
+    dir="`echo  \"$path\" | sed -e  's|:.*$||'`"
+    path="`echo \"$path\" | sed -ne 's|^[^:]*:||p'`"
+    #
+    for item in perl5 perl miniperl
+    do
+        file="$dir/$item"
+        if [ -f "$file" -a -r "$file" -a $test_s "$file" -a $test_x "$file" ]
+        then
+            float="`$file -e 'printf(\"%6.5f\n\",\$]);'`"
+            integer="`echo \"$float\" | sed -e 's|\..*$||'`"
+            if [ "$integer" -ge 5 ]
+            then
+                fixed="`echo \"$float\" | sed -e 's|\.||'`"
+                if [ "$fixed" -gt "$perl_rating" ]
+                then
+                    perl="$file"
+                    perl_name="$item"
+                    perl_rating="$fixed"
+                fi
+            fi
+        fi
+    done
+done
+
+if [ "x$perl" = "x" ]
+then
+    source="$BnP_lib/perl/src"
+    distribution="$perl_version.tar.gz"
+    if fetch "$distribution" "src/5.0" "$source"
+    then
+        distribution="$file"
+    else
+        stderr "Resolve this problem and re-run '$self',"
+        stderr "or download '$distribution' manually"
+        stderr "into the directory '$source'"
+        stderr "and re-run '$self'!"
+        quit 1
+    fi
+    #
+    stdout "Compiling miniperl for bootstrapping - please be patient (~5 min)!"
+    #
+    logfile="/tmp/$self.miniperl.log"
+    perform rm -rf "/tmp/$perl_version"
+    perform rm -f "$logfile"
+    #
+    (
+        umask 022
+        critical cd /tmp
+        critical gunzip -c <"$distribution" | tar xf -
+        critical cd "$perl_version"
+        critical cat Configure | sed -e 's|if test ! -t 0|if false|' \
+            >Configure.batch_enabled
+        critical mv Configure Configure.original
+        critical mv Configure.batch_enabled Configure
+        critical chmod 555 Configure
+        critical /bin/sh ./Configure -des
+        critical make miniperl
+        critical strip miniperl
+    ) >>"$logfile" 2>>"$logfile"
+    if [ $? -eq 0 ]
+    then
+        make_copy "/tmp/$perl_version" "miniperl" "$BnP_lib" "555"
+        perform rm -rf "/tmp/$perl_version"
+        perform rm -f "$logfile"
+        perl="$BnP_lib/miniperl"
+        perl_name="miniperl"
+    else
+        stderr "Building of 'miniperl' failed!"
+        stderr "See distribution directory '/tmp/$perl_version'"
+        stderr "and log file '$logfile' for more details!"
+        quit 1
+    fi
+fi
+
+##
+## Process all targets:
+##
+
+for bundle in "$@"
+do
+    target="`echo \"$bundle\" | \
+        sed -e 's|  *||g; s|\.\.*|.|g; s|^\.||; s|\.$||'`"
+    subset="`echo \"$target\" | sed -ne 's|^[^\.]*\.||p'`"
+    target="`echo \"$target\" | sed -e  's|\..*$||'`"
+    #
+    case "$target" in
+    clean)
+        stdout "Deleting the internal workspace - please be patient (~5 min)!"
+        #
+        perform rm -rf "$BnP_tmp"
+        make_dir "$BnP_tmp"
+        #
+        for item in $external_targets
+        do
+            perform rm -f "$BnP_lib/$item/recover."*
+        done
+        ;;
+    bnp)
+        if [ -f "$origin/.cdrom" ]
+        then
+            if [ "x$perl_name" = "xminiperl" ]
+            then
+                stderr "Can't install the \"Build'n'Play\" (BnP) package yet,"
+                stderr "there is no full-fledged Perl 5 binary available yet!"
+                stderr "Please re-run this command ('$self bnp')"
+                stderr "after successfully completing '$self perl'!"
+                quit 1
+            else
+                stdout "Installing the \"Build'n'Play\" (BnP) package itself..."
+                #
+                find_file "pod2man" "$PATH"
+                pod2man="$file"
+                #
+                install_bnp
+                install_man
+                #
+                # Let "genopt" create the necessary links (if appropriate):
+                #
+                if [ "x$use_genopt" = "xyes" ]
+                then
+                    call_genopt -dbin,man "$BnP_physical"
+                fi
+            fi
+        else
+            stderr "Can't install the \"Build'n'Play\" (BnP) package;"
+            stderr "please re-run this command ('$self bnp')"
+            stderr "from the CD-ROM or the original distribution!"
+            quit 1
+        fi
+        ;;
+    *)
+        if [ "x$use_genopt" = "xyes" ]
+        then
+            physical="$prefix/$physical_dir/${category}$target"
+            logical="$prefix/$logical_dir/$target"
+            #
+            # Get the list of subdirectories to create for this target:
+            #
+            eval "list=\$subdirs_${target}"
+            #
+            # Call "genopt" to create the directory subtree for this target
+            # and to create the link from the logical to the physical
+            # installation root directory:
+            #
+            call_genopt -c -d "$list" "$physical"
+        else
+            physical="$prefix"
+            logical="$prefix"
+        fi
+        #
+        # Find the script and the library who know how to install the target:
+        #
+        home="$BnP_lib/$target"
+        find_file "$target.bnp" "$home" "deep"
+        script="$file"
+        source="$dir"
+        #
+        find_file "BnP.pm" "$BnP_lib" "deep"
+        #
+        # Call this script to do the actual work:
+        #
+        "$perl" "$script" "$target" "$subset" "$logical" "$home" "$BnP_tmp" \
+            "$perl" "$sites" "$default_stubs" "$search" "$dir"
+        if [ $? -eq 0 ]
+        then
+            #
+            # Let "genopt" finish the installation (if enabled):
+            #
+            if [ "x$use_genopt" = "xyes" ]
+            then
+                stdout \
+        "Updating the symbolic link access layer - please be patient (~5 min)!"
+                #
+                call_genopt "$physical"
+            fi
+        else
+            stderr "Building of target '$target' aborted;"
+            stderr "resolve this problem and re-run '$self $target'!"
+            stderr "Check the internal workspace"
+            stderr "in directory '$BnP_tmp'"
+            stderr "as well as the installation script '$target.bnp'"
+            stderr "and the automatic recovery file 'recover.bnp'"
+            stderr "in directory '$home'!"
+            #
+            if [ "x$source" != "x$home" -a -f "$source/.cdrom" -a ! \
+                -f "$home/$target.bnp" ]
+            then
+                make_copy "$source" "$target.bnp" "$home" "644"
+            fi
+            quit 1
+        fi
+    esac
+done
+
+##
+## The End:
+##
+
+stdout "All targets have been built successfully."
+
+quit 0
+
+##
+## EOF
+##
+

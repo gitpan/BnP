@@ -1,0 +1,345 @@
+#!perl
+
+require 5.000;
+
+###############################################################################
+##                                                                           ##
+##    This is the "gimp.bnp" Perl script of "Build'n'Play" (BnP).            ##
+##                                                                           ##
+##    (The script which knows how to install Gimp.)                          ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This script is a complete rewrite of a script initially written        ##
+##    by Ralf S. Engelschall.                                                ##
+##                                                                           ##
+##    Copyright (c) 1996 - 1998 by Ralf S. Engelschall.                      ##
+##    All rights reserved.                                                   ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "gimp.bnp" was developed with support from O'Reilly    ##
+##    Verlag and was first published on the CD-ROM accompanying the book     ##
+##    "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).               ##
+##                                                                           ##
+##    Diese Version von "gimp.bnp" entstand mit Unterstuetzung des O'Reilly  ##
+##    Verlag und wurde erstmalig auf der CD-ROM zum Buch "Programmieren      ##
+##    mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.              ##
+##                                                                           ##
+###############################################################################
+
+package BnP::gimp;
+
+BEGIN { unshift(@INC, pop(@ARGV)); }
+
+use BnP;
+
+##
+## Note that we cannot use any other "use" here at all, because in most
+## cases, this will require the "Exporter" module, which miniperl (used
+## for bootstrapping) does not provide (nor any other module)!
+##
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# What are the URLs of your favourite (= fastest) CPAN
+# and gimp mirror sites? The URLs will be tried in the
+# given order, from top to bottom.
+#
+@URL =
+(
+    'ftp://ftp.gimp.org/pub',
+    'ftp://ftp.funet.fi/pub/languages/perl/CPAN',
+    'http://www.perl.com/CPAN',
+    'ftp://ftp.engelschall.com/pub/bnp/packages'
+);
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+$VERSION = "2.1.0 (09-Nov-1998)";  ##  no 'my' for MakeMaker!
+
+##
+## Fetch our remaining private parameters:
+##
+
+my $Path = pop(@ARGV);
+my $Stub = pop(@ARGV);
+my $Site = pop(@ARGV);
+my $Perl = pop(@ARGV);
+
+##
+## Declaration of global variables:
+##
+
+my $SourceDir;
+my $Compiler;
+my $Prefix;
+my $BnP;
+
+##
+## Check some basic requirements:
+##
+
+if (find('gmake', $ENV{'PATH'}) eq '')
+{
+    alert "You need to have a GNU 'make' called 'gmake'!";
+    alert "If you already have a GNU 'make',";
+    alert "simply create a link to it named 'gmake'.";
+    fatal "Otherwise you need to 'build tools.gmake' first.";
+}
+
+if (find('bunzip2', $ENV{'PATH'}) eq '')
+{
+    fatal "You need to 'build tools.bzip2' first!";
+}
+
+&indispensable
+(
+    'cp',
+    'mv',
+    'sh',
+    'tar',
+    'xset',
+    'make',
+    'chmod',
+    'which',
+    'gunzip',
+    'sendmail'
+);
+
+##
+## Main:
+##
+
+if ($Perl =~ /\bminiperl$/)
+{
+    alert "Can't install '$ARGV[0]' using only 'miniperl',";
+    fatal "you need to 'build perl' first!";
+}
+else
+{
+    alert "Installing all Perl modules to the Perl 5 installation tree";
+    alert "belonging to the Perl binary '$Perl'...";
+}
+
+# =========================================================================== #
+
+$BnP = BnP->new( @ARGV );
+
+$Prefix = $BnP->prefix();
+
+$SourceDir = $BnP->homedir() . "/src";
+
+# =========================================================================== #
+
+$BnP->begin();
+
+$BnP->path( $Path );
+
+$BnP->stub( $Stub );
+
+$BnP->url( $Site, @URL );
+
+chomp($Compiler = `"$Perl" -e 'use Config; print \$Config{"cc"}, "\\n"'`);
+
+# =========================================================================== #
+
+# Note that on some systems you need to prepend the installation directory
+# to "LD_LIBRARY_PATH", whereas on other systems you need to run "ldconfig"
+# after each "make install" (see below).
+#
+#$ENV{'LD_LIBRARY_PATH'} =~ s!^!$Prefix/lib:!;
+#$ENV{'LD_LIBRARY_PATH'} =~ s!:$!!;
+
+#
+#   Gtk
+#
+$BnP->fetch("gtk+-1.0.5.tar.gz", 'gtk/v1.0', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/gtk+-1.0.5.tar.gz' | tar xf -");
+$BnP->chdir("gtk+-1.0.5");
+$BnP->system("CC=\"$Compiler\" ./configure --prefix=\"$Prefix\"");
+# $BnP->patch("glib/gutils.c", 's!extern char \*sys_siglist\[\];!!');
+$BnP->system("make");
+$BnP->system("make install");
+# On some systems you need to run "ldconfig" now:
+#$BnP->system("ldconfig || true");
+$BnP->back();
+
+#
+#   Gtk Perl Interface
+#
+$BnP->fetch("Gtk-0.3.tar.gz", 'authors/id/KJALB', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Gtk-0.3.tar.gz' | tar xf -");
+$BnP->chdir("Gtk-0.3");
+$BnP->patch("Makefile.PL",
+"s!^(if\\s+\\(defined\\s+\\\$inc\\s+.*)\$!\\\$inc .= \" -I'$Prefix/include' -I'$Prefix/lib/glib/include' -I/usr/X11R6/include\";\\n\$1!");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make pure_install");
+$BnP->back();
+
+#
+#   MPEG Library
+#
+$BnP->fetch("mpeg_lib-1.2.1-hacked-for-gimp.tar.gz", 'gimp/libs', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/mpeg_lib-1.2.1-hacked-for-gimp.tar.gz' |",
+    "tar xf -");
+$BnP->chdir("mpeg_lib");
+$BnP->system("CC=\"$Compiler\" ./configure");
+$BnP->system("make");
+$BnP->system("cp -p libmpeg.a '$Prefix/lib/'");
+$BnP->system("cp -p mpeg.h '$Prefix/include/'");
+$BnP->back();
+
+#
+#   Gimp
+#
+$BnP->fetch("gimp-1.0.0.tar.gz", 'gimp/v1.0/v1.0.0', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/gimp-1.0.0.tar.gz' | tar xf -");
+$BnP->chdir("gimp-1.0.0");
+$BnP->system("CC=\"$Compiler\"",
+    "CFLAGS='-I\"$Prefix/include\"'",
+    "LDFLAGS='-L\"$Prefix/lib\"'",
+    "./configure",
+    "--prefix=\"$Prefix\"",
+    "--with-gtk-prefix=\"$Prefix\"",
+    "--with-gtk-exec-prefix=\"$Prefix\"",
+    '--with-sendmail="`which sendmail`"');
+$BnP->system("gmake");
+$BnP->system("gmake install");
+$BnP->system("mv '$Prefix/bin/gimp' '$Prefix/bin/gimp.bin'");
+$BnP->system("(",
+    "echo '#!/bin/sh';",
+    "echo 'LD_LIBRARY_PATH=\"$Prefix/lib\"; export LD_LIBRARY_PATH';",
+    "echo 'xset fp+ \"$Prefix/share/freefont\"; xset fp rehash';",
+    "echo 'exec \"$Prefix/bin/gimp.bin\" \"\$\@\" &'",
+    ") >'$Prefix/bin/gimp'; chmod a+x '$Prefix/bin/gimp'");
+# On some systems you need to run "ldconfig" now:
+#$BnP->system("ldconfig || true");
+$BnP->back();
+
+#
+#   Gimp Third-Party Plugins
+#
+$BnP->fetch("gimp-plugins-unstable-1.0.0.tar.gz", 'gimp/v1.0/v1.0.0',
+    $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/gimp-plugins-unstable-1.0.0.tar.gz' |",
+    "tar xf -");
+$BnP->chdir("gimp-plugins-unstable-1.0.0");
+$BnP->system("CC=\"$Compiler\"",
+    "CFLAGS='-I\"$Prefix/include\"'",
+    "LDFLAGS='-L\"$Prefix/lib\"'",
+    "./configure",
+    "--prefix=\"$Prefix\"",
+    "--with-gtk-prefix=\"$Prefix\"",
+    "--with-gtk-exec-prefix=\"$Prefix\"",
+    "--without-tcl",
+    "--without-tk");
+foreach $subdir (qw(
+    twist guash gimpressionist
+    DigitalSignature Encrypt_Decrypt
+    ascii figures ))
+{
+    $BnP->chdir($subdir);
+    $BnP->system("gmake");
+    $BnP->system("gmake install");
+    $BnP->back();
+}
+$BnP->back();
+
+#
+#   Gimp Data Minimal
+#
+$BnP->fetch("gimp-data-min-0.99.tar.bz2", '----', $SourceDir);
+$BnP->system("bunzip2 <'$SourceDir/gimp-data-min-0.99.tar.bz2' | tar xf -");
+$BnP->chdir("gimp-data-min-0.99");
+$BnP->system("./configure --prefix=\"$Prefix\"");
+$BnP->system("gmake");
+$BnP->system("gmake install");
+$BnP->back();
+
+#
+#   Gimp Data Extended
+#
+$BnP->fetch("gimp-data-extras-1.0.0.tar.gz", 'gimp/v1.0/v1.0.0', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/gimp-data-extras-1.0.0.tar.gz' | tar xf -");
+$BnP->chdir("gimp-data-extras-1.0.0");
+$BnP->system("./configure --prefix=\"$Prefix\"");
+$BnP->system("gmake");
+$BnP->system("gmake install");
+$BnP->back();
+
+#
+#   Gimp Fonts
+#
+$BnP->fetch("freefonts-0.10.tar.gz", 'gimp/fonts', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/freefonts-0.10.tar.gz' | tar xf -");
+$BnP->chdir("freefont");
+$BnP->system("rm -f README *.license *.tgz");
+$BnP->back();
+$BnP->mkdir("$Prefix/share/freefont");
+$BnP->system("cp -rp freefont/* '$Prefix/share/freefont/'");
+
+$BnP->fetch("sharefonts-0.10.tar.gz", 'gimp/fonts', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/sharefonts-0.10.tar.gz' | tar xf -");
+$BnP->chdir("sharefont");
+$BnP->system("rm -f README *.shareware *.tgz");
+$BnP->back();
+$BnP->mkdir("$Prefix/share/freefont");
+$BnP->system("cp -rp sharefont/* '$Prefix/share/freefont/'");
+
+#
+#   Gimp Perl Interface
+#
+$BnP->fetch("Gimp-1.034.tar.gz", 'authors/id/MLEHMANN', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Gimp-1.034.tar.gz' | tar xf -");
+$BnP->chdir("Gimp-1.034");
+$ENV{'PATH'} .= ":$Prefix/bin";
+$BnP->system("echo 'y' | '$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make pure_install");
+$BnP->back();
+
+#
+#   Cleanup
+#
+my $genopt =
+    find('genopt', join(':', $ENV{'PATH'}, map(($_,"$_/BnP"), $BnP->path())));
+
+if ($genopt ne '')
+{
+    $Perl = expand($Perl);
+    if ($Perl =~
+        m!^(.+)/(packages(?:/[^/]+)*/perl[^/]*)/bin/perl(?:5(?:\.\d+)?)?$!)
+    {
+        $Prefix = $1; $Perl = $2;
+        $BnP->system("'$genopt' -p '$Prefix' -dbin,man '$Prefix/$Perl'");
+    }
+}
+
+# =========================================================================== #
+
+$BnP->end();
+
+# =========================================================================== #
+
+__END__
+

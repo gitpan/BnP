@@ -1,0 +1,91 @@
+     ____          _  _      _  _         _  ____   _
+    | __ )  _   _ (_)| |  __| |( ) _ __  ( )|  _ \ | |  __ _  _   _
+    |  _ \ | | | || || | / _` ||/ | '_ \ |/ | |_) || | / _` || | | |
+    | |_) || |_| || || || (_| |   | | | |   |  __/ | || (_| || |_| |
+    |____/  \__,_||_||_| \__,_|   |_| |_|   |_|    |_| \__,_| \__, |
+                                                              |___/
+
+
+      "Build'n'Play" is a batch tool for administrators who have to
+      install the same software packages on various Unix platforms
+      over and over again.
+
+      The most important feature of "Build'n'Play" is its capability
+      to automatically resume the installation process at the exact
+      position where it was interrupted after an error occurred.
+
+      Note that when installing for the first time, the installation
+      scripts included here will need to be adjusted for the operating
+      system in question at several places; therefore do not expect
+      the installation to complete without any interruptions the first
+      time around.
+
+
+Installation:
+=============
+
+!!! UNDER CONSTRUCTION !!!
+
+See the file "INSTALL.de" instead in the meantime if you have a reading
+understanding of German, or refer to the file "build.pod" (especially to
+the section "DIAGNOSTICS", which gives a lot of (hopefully) helpful hints).
+
+See also the file "restart" in the subdirectory "misc" in this distribution
+for examples of how to use this tool.
+
+
+Authors:
+========
+
+Ralf S. Engelschall - original idea and first private versions
+
+rse@engelschall.com
+www.engelschall.com
+
+Steffen Beyer       - complete rewrite and documentation
+                      (first public version)
+
+ sb@engelschall.com
+www.engelschall.com/u/sb/download/
+
+
+Copyright:
+==========
+
+Copyright (c) 1996 - 1998 by Ralf S. Engelschall.
+All rights reserved.
+
+Copyright (c) 1998 by Steffen Beyer.
+All rights reserved.
+
+
+License:
+========
+
+"Build'n'Play" is free software; you can redistribute it and/or modify it
+under the same terms and conditions as Perl, i.e., under either (at your
+option) the "Artistic License" or the "GNU General Public License".
+
+Please see the files "Artistic.txt" and "GNU_GPL.txt" in this distribution
+for details!
+
+
+Disclaimer:
+===========
+
+"Build'n'Play" is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "GNU General Public License" for more details.
+
+
+Miscellaneous:
+==============
+
+Should you find bugs in "Build'n'Play" or need assistance, please contact
+Steffen Beyer <sb@engelschall.com>.
+
+Thank you very much!
+
+

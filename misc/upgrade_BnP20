@@ -1,0 +1,129 @@
+#!/opt/bin/perl -w
+
+###############################################################################
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This utility serves to upgrade existing installation scripts           ##
+##    automatically (at least as far as possible and reasonable)             ##
+##    from Ralf S. Engelschall's original version 1.0 of "BnP"               ##
+##    to Steffen Beyer's overhauled new version 2.0.* of "BnP".              ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl itself.                  ##
+##                                                                           ##
+###############################################################################
+
+use strict;
+no strict "vars";
+
+$self = $0;
+$self =~ s!^.*/!!;
+
+sub b
+{
+    my($text) = @_;
+
+    $text =~ s!//+!/!g;
+    $text =~ s![^/]+!!g;
+    $text = length($text) + 1;
+    if ($text < 2) { return ""; }
+    else           { return "$text"; }
+}
+
+sub x
+{
+    my($text) = @_;
+
+    $text =~ s!^\s*"!'!;
+    $text =~ s!"\s*$!'!;
+    $text =~ s!/+'$!'!;
+    return $text;
+}
+
+sub s
+{
+    my($text) = @_;
+
+    $text =~ s!^[^(]*\(\s*!!;
+    $text =~ s!\s*\)[^)]*$!!;
+    return &x($text);
+}
+
+sub z
+{
+    my($text) = @_;
+
+    $text =~ s!^\s*["']\s*!!;
+    $text =~ s!\s*["']\s*$!!;
+    $text =~ s!^.*/!!;
+    return "'\$SourceDir/$text'";
+}
+
+unless (@ARGV)
+{
+    print "\nUsage: $self <filename> [<filename> ...]\n\n";
+    print "This utility serves to upgrade existing installation scripts\n";
+    print "automatically (at least as far as possible and reasonable)\n";
+    print "from Ralf S. Engelschall's original version 1.* of \"BnP\"\n";
+    print "to Steffen Beyer's overhauled new version 2.*.* of \"BnP\".\n\n";
+    exit(0);
+}
+
+FILE:
+foreach $file (@ARGV)
+{
+    unless (-f $file)
+    {
+        warn "$self: unable to find \"$file\"!\n";
+        next FILE;
+    }
+    unless (rename($file,"$file.bak"))
+    {
+        warn "$self: unable to rename \"$file\" to \"$file.bak\": $!\n";
+        next FILE;
+    }
+    unless (open(INPUT, "<$file.bak"))
+    {
+        warn "$self: unable to read \"$file.bak\": $!\n";
+        next FILE;
+    }
+    unless (open(OUTPUT, ">$file"))
+    {
+        warn "$self: unable to write \"$file\": $!\n";
+        close(INPUT);
+        next FILE;
+    }
+    print "$self: upgrading \"$file\"...\n";
+    while (<INPUT>)
+    {
+        s![ \t]+$!!;
+        s!\t!    !g;
+        s!^(\s*)(.+?)\s*\($!${1}${2}\n${1}(!;
+        s!^(\s*)(.+?)\s*\{$!${1}${2}\n${1}\{!;
+        s!\bBnP::cmd\s*\(\s*0\s*,\s*!\$BnP->system(!g;
+        s!\bBnP::sed\s*\(\s*0\s*,\s*!\$BnP->patch(!g;
+        s!\bBnP::chdir\s*\(\s*['"](\.\.(?:/+\.\.)*)/*['"]\s*\)\s*;!"\$BnP->back(".&b($1).");"!eg;
+        s!\bBnP::fetch\s*\(\s*([^,]+),\s*([^,]+),\s*[^,]+\s*\)\s*;!"\$BnP->fetch(".&x($2).", ".&s($1).", \$SourceDir);"!eg;
+        s!\bBnP::\b!\$BnP->!g;
+        s!\binstall_pod2html\b!install_manpage!g;
+        s!\bmanual_pod2html\b!install_perl_manpages!g;
+        s!\bpure_makemaker_pod2html\b!install_package_manpages!g;
+        s!\bmakemaker_pod2html\b!install_tree_manpages!g;
+        s,\\"\#!\$prefix/bin/perl\\",'\#!\$Perl',g;
+        s!\$prefix/bin/perl\b!'\$Perl'!g;
+        s!\$prefix/html(?:/+[_\.:\w/-]*)?!'\$Prefix/html/mod'!g;
+        s!\$prefix/([_\.:\w/-]+)!'\$Prefix/$1'!g;
+        s!\bgunzip\s+((?:-c\s)?)\s*(\S+)\s+!"gunzip $1".&z($2)." "!eg;
+        s!\btar\s+(?:-)?xvf\b!tar xf!g;
+        s!\$BnP->system\s*\(\s*["']\s*mkdir\s+(?:["'])?([\$_\.\w/-]+)(?:["'])?\s*(?:\|\|\s+true)?\s*["']\s*\)\s*;!\$BnP->mkdir("$1");!;
+        s!\s*=\s*\$prefix\b!=\\"\$Prefix\\"!g;
+        s!\$prefix\b!\$Prefix!g;
+        print OUTPUT;
+    }
+    close(INPUT);
+    close(OUTPUT);
+}
+
+__END__
+

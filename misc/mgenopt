@@ -1,0 +1,65 @@
+#!/bin/sh
+
+###############################################################################
+##                                                                           ##
+##    This is the "mgenopt" command of "Build'n'Play" (BnP).                 ##
+##                                                                           ##
+##    (A tool for recursively applying "genopt" to a whole "genopt"          ##
+##    software installation hierarchy (or subtree thereof), for (re-)        ##
+##    building the whole symbolic link access layer (or parts thereof).      ##
+##    To rebuild the *whole* symbolic link access layer, simply remove       ##
+##    all the files and subdirectories in directory /opt except for the      ##
+##    "packages" subdirectory, and then call "mgenopt".                      ##
+##    All parameters given to "mgenopt" are simply (transparently) passed    ##
+##    through to "genopt" (useful for using the "-f" option, for instance).  ##
+##    This tool traverses all directories in the directory tree of           ##
+##    /opt/packages and determines if the directory in question meets        ##
+##    the criteria for applying "genopt", and if so, calls "genopt".         ##
+##    All relevant output is saved in log files for later reference.)        ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+logical=/opt
+physical=/opt/packages
+
+errfile="$logical/.genopt.errors"
+exclude="$logical/.genopt.exclude"
+logfile="$logical/.genopt.logfile"
+
+cp /dev/null "$errfile"
+cp /dev/null "$exclude"
+cp /dev/null "$logfile"
+
+for dir in `find "$physical" -type d -print`
+do
+    path="`echo \"$dir\" | sed -e 's|//*|/|g; s|/$||'`"
+    #
+    if [ -d "$path/arc" -o -d "$path/bin" ]
+    then
+        okay="yes"
+        for item in arc bin etc include info lib man shlib texmf xad
+        do
+            flag="`echo \"$path/\" | sed -ne \"s|/${item}/||p\"`"
+            if [ "x$flag" != "x" ]
+            then
+                okay=""
+                break
+            fi
+        done
+        if [ "x$okay" = "x" ]
+        then
+            echo "Excluding '$path'" >&2
+            echo "$path" >>"$exclude"
+        else
+#           echo "Scanning '$path'" >&2
+            genopt "$@" "$path" 2>&1 | tee -a "$logfile"
+        fi
+    fi
+done
+

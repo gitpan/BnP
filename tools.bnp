@@ -1,0 +1,308 @@
+#!perl
+
+require 5.000;
+
+###############################################################################
+##                                                                           ##
+##    This is the "tools.bnp" Perl script of "Build'n'Play" (BnP).           ##
+##                                                                           ##
+##    (The script which knows how to install the tools                       ##
+##    needed throughout the "Build'n'Play" package.)                         ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "tools.bnp" was developed with support from            ##
+##    O'Reilly Verlag and was first published on the CD-ROM accompanying     ##
+##    the book "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).      ##
+##                                                                           ##
+##    Diese Version von "tools.bnp" entstand mit Unterstuetzung des          ##
+##    O'Reilly  Verlag und wurde erstmalig auf der CD-ROM zum Buch "Pro-     ##
+##    grammieren mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.   ##
+##                                                                           ##
+###############################################################################
+
+package BnP::tools;
+
+BEGIN { unshift(@INC, pop(@ARGV)); }
+
+use BnP;
+
+##
+## Note that we cannot use any other "use" here at all, because in most
+## cases, this will require the "Exporter" module, which miniperl (used
+## for bootstrapping) does not provide (nor any other module)!
+##
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# What are the URLs of your favourite (= fastest)
+# mirror sites? The URLs will be tried in the given
+# order, from top to bottom.
+#
+@URL =
+(
+    'ftp://ftp.mint.net/pub/snarf',
+    'ftp://ftp.gnu.org/pub/gnu',
+    'http://www.digistar.com/bzip2',
+    # (See also the "bzip2" home page at:
+    # http://www.muraroa.demon.co.uk/.)
+    'ftp://ftp.netsw.org/netsw/System/Tools/FileUtils/Diff',
+    'ftp://ftp.engelschall.com/pub/bnp/packages'
+);
+
+# Which versions of snarf, GNU make, bzip2 and patch
+# should be installed? Initial settings are:
+# "$snarf = 'snarf-1.6.1b';"
+# "$gmake = 'make-3.77';"
+# "$bzip2 = 'bzip2-0.9.0b';"
+# "$patch = 'patch-2.5.3';"
+#
+$snarf = 'snarf-1.6.1b';
+$gmake = 'make-3.77';
+$bzip2 = 'bzip2-0.9.0b';
+$patch = 'patch-2.5.3';
+
+# (Note that preference has been given here to a stable
+# version of "snarf" rather than the latest version. If
+# you want to use the latest version, you may need to
+# adjust the configuration of "snarf" in "build" and
+# "BnP.pm" to use the "-q" ("quiet") option.)
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+$VERSION = "2.1.0 (09-Nov-1998)";  ##  no 'my' for MakeMaker!
+
+##
+## Fetch our remaining private parameters:
+##
+
+my $Path = pop(@ARGV);
+my $Stub = pop(@ARGV);
+my $Site = pop(@ARGV);
+my $Perl = pop(@ARGV);
+
+##
+## Initialization of internal constants:
+##
+
+if (exists $ENV{'BNP_SNARF'}) { $snarf = $ENV{'BNP_SNARF'}; }
+if (exists $ENV{'BNP_GMAKE'}) { $gmake = $ENV{'BNP_GMAKE'}; }
+if (exists $ENV{'BNP_BZIP2'}) { $bzip2 = $ENV{'BNP_BZIP2'}; }
+if (exists $ENV{'BNP_PATCH'}) { $patch = $ENV{'BNP_PATCH'}; }
+
+##
+## Declaration of global variables:
+##
+
+my $SourceDir;
+my $Prefix;
+my $BnP;
+
+##
+## Check some basic requirements:
+##
+
+&indispensable
+(
+    'ar',
+    'cp',
+    'mv',
+    'ln',
+    'sh',
+    'tar',
+    'make',
+    'chmod',
+    'gunzip',
+    'install'
+);
+
+##
+## Main:
+##
+
+# =========================================================================== #
+
+$BnP = BnP->new( @ARGV );
+
+$Prefix = $BnP->prefix();
+
+$SourceDir = $BnP->homedir() . "/src";
+
+# =========================================================================== #
+
+$BnP->begin();
+
+$BnP->path( $Path );
+
+$BnP->stub( $Stub );
+
+$BnP->url( $Site, @URL );
+
+# =========================================================================== #
+
+$BnP->begin_must_section();
+
+$BnP->mkdir("$Prefix/man/man1");
+
+$BnP->end_must_section();
+
+# =========================================================================== #
+
+$BnP->begin_section("snarf");
+
+# =========================================================================== #
+
+$BnP->fetch("$snarf.tar.gz", '', $SourceDir);
+
+$BnP->system("gunzip -c '$SourceDir/$snarf.tar.gz' | tar xf -");
+
+$BnP->chdir($snarf);
+
+$BnP->system("/bin/sh ./configure",
+             "--prefix=\"$Prefix\"",
+             "$ENV{'BNP_FLAGS'}");
+
+my $uid = getpwuid($>);
+my $gid = getgrgid((split(' ',$)))[0]);
+
+$BnP->patch("Makefile",
+    "s!\\b(USER\\s*=\\s*)\\w+\\b!\${1}$uid!",
+    "s!\\b(GROUP\\s*=\\s*)\\w+\\b!\${1}$gid!");
+
+$BnP->system("make");
+$BnP->system("make install");
+
+$BnP->back();
+
+# =========================================================================== #
+
+$BnP->end_section("snarf");
+
+# =========================================================================== #
+
+$BnP->begin_section("gmake");
+
+# =========================================================================== #
+
+$BnP->fetch("$gmake.tar.gz", '', $SourceDir);
+
+$BnP->system("gunzip -c '$SourceDir/$gmake.tar.gz' | tar xf -");
+
+$BnP->chdir($gmake);
+
+$BnP->system("/bin/sh ./configure",
+             "--prefix=\"$Prefix\"",
+             "$ENV{'BNP_FLAGS'}");
+
+$BnP->system("make");
+$BnP->system("make install");
+$BnP->system("mv '$Prefix/bin/make' '$Prefix/bin/gmake'");
+$BnP->system("mv '$Prefix/man/man1/make.1' '$Prefix/man/man1/gmake.1'");
+
+$BnP->back();
+
+# =========================================================================== #
+
+$BnP->end_section("gmake");
+
+# =========================================================================== #
+
+$BnP->begin_section("bzip2");
+
+# =========================================================================== #
+
+$BnP->fetch("$bzip2.tar.gz", '', $SourceDir);
+
+$BnP->system("gunzip -c '$SourceDir/$bzip2.tar.gz' | tar xf -");
+
+$BnP->chdir($bzip2);
+
+# For SunOS:
+# $BnP->system("mv Makefile Makefile.orig");
+# $BnP->system("ln Makefile-sunos4 Makefile");
+
+$BnP->system("make");
+
+$BnP->system("cp bzip2 '$Prefix/bin/bzip2';",
+    "chmod 555 '$Prefix/bin/bzip2'");
+
+$BnP->system("cp bzip2recover '$Prefix/bin/bzip2recover';",
+    "chmod 555 '$Prefix/bin/bzip2recover'");
+
+$BnP->system("ln '$Prefix/bin/bzip2' '$Prefix/bin/bunzip2'");
+
+$BnP->system("ln '$Prefix/bin/bzip2' '$Prefix/bin/bzcat'");
+
+$BnP->system("cp bzip2.1 '$Prefix/man/man1/bzip2.1';",
+    "chmod 444 '$Prefix/man/man1/bzip2.1'");
+
+$BnP->system("ln '$Prefix/man/man1/bzip2.1' '$Prefix/man/man1/bunzip2.1'");
+
+$BnP->system("ln '$Prefix/man/man1/bzip2.1' '$Prefix/man/man1/bzcat.1'");
+
+$BnP->system("cp libbz2.a '$Prefix/lib/libbz2.a';",
+    "chmod 444 '$Prefix/lib/libbz2.a'");
+
+$BnP->system("cp bzlib.h '$Prefix/include/bzlib.h';",
+    "chmod 444 '$Prefix/include/bzlib.h'");
+
+$BnP->back();
+
+# =========================================================================== #
+
+$BnP->end_section("bzip2");
+
+# =========================================================================== #
+
+$BnP->begin_section("patch");
+
+# =========================================================================== #
+
+$BnP->fetch("$patch.tar.gz", '', $SourceDir);
+
+$BnP->system("gunzip -c '$SourceDir/$patch.tar.gz' | tar xf -");
+
+$BnP->chdir($patch);
+
+$BnP->system("/bin/sh ./configure",
+             "--prefix=\"$Prefix\"",
+             "$ENV{'BNP_FLAGS'}");
+
+$BnP->system("make");
+
+$BnP->system("make install");
+
+$BnP->back();
+
+# =========================================================================== #
+
+$BnP->end_section("patch");
+
+# =========================================================================== #
+
+$BnP->end();
+
+# =========================================================================== #
+
+__END__
+

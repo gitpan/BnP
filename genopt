@@ -1,0 +1,1517 @@
+#!/bin/sh
+
+###############################################################################
+##                                                                           ##
+##    This is the "genopt" command of "Build'n'Play" (BnP).                  ##
+##                                                                           ##
+##    (A tool for maintaining a symbolic link access layer to software       ##
+##    packages installed in individual and separate directory structures,    ##
+##    facilitating the relocation after installation and permitting the      ##
+##    complete removal (de-installation) without any residues of such        ##
+##    software packages.)                                                    ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This tool has been inspired by a tool of the same name and function    ##
+##    written by Ralf S. Engelschall.                                        ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "genopt" was developed with support from O'Reilly      ##
+##    Verlag and was first published on the CD-ROM accompanying the book     ##
+##    "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).               ##
+##                                                                           ##
+##    Diese Version von "genopt" entstand mit Unterstuetzung des O'Reilly    ##
+##    Verlag und wurde erstmalig auf der CD-ROM zum Buch "Programmieren      ##
+##    mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.              ##
+##                                                                           ##
+###############################################################################
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# Enable or disable informational messages (use an empty string
+# to disable, a non-empty string to enable; initial setting is
+# "verbose=yes"):
+#
+verbose=yes
+
+# Choose here between a detailed or an "errors only" log file format
+# (use an empty string to disable, a non-empty string to enable;
+# initial setting is "details="""):
+#
+details=""
+
+# What is the default prefix of the software package installation
+# hierarchy and symbolic link access layer maintained by this tool?
+# Must be given as an ABSOLUTE path. (E.g. "DEFAULT_LOGICAL_ROOT=/opt".)
+#
+DEFAULT_LOGICAL_ROOT=/opt
+
+# What is the default path to the physical software package installation
+# subtree (i.e., where all the software packages are installed physically)
+# below the installation prefix?
+# May be given either as an ABSOLUTE path (which MUST begin with the default
+# installation prefix as defined above!) or as a RELATIVE path (which is
+# relative to whatever the setting of "LOGICAL_ROOT" will be at runtime).
+# (Obviously the latter provides much more flexibility!)
+# (E.g. "DEFAULT_PHYSICAL_ROOT=/opt/packages",
+# "DEFAULT_PHYSICAL_ROOT=packages".)
+#
+DEFAULT_PHYSICAL_ROOT=packages
+
+#///////////////////////////////////////////////////////////////////////////
+#//                                                                       //
+#//     Don't forget to include the directories                           //
+#//     "$DEFAULT_LOGICAL_ROOT/bin",     "$DEFAULT_LOGICAL_ROOT/man",     //
+#//     "$DEFAULT_LOGICAL_ROOT/info" and "$DEFAULT_LOGICAL_ROOT/xad"      //
+#//     in your "$PATH", "$MANPATH", "$INFOPATH" and "$XAPPLRESDIR"       //
+#//     environment variables, respectively!                              //
+#//                                                                       //
+#///////////////////////////////////////////////////////////////////////////
+
+# Choose here between a more conservative approach or a "fast" mode. When
+# this option is disabled (default) this will cause inconsistencies in the
+# index files to be corrected automatically. Enabling it will trust the
+# index files that a link contained in them really exists (and that a link
+# NOT contained in them does NOT exist) and will not check the file system
+# as in the standard mode. Therefore, when this option is enabled, the
+# detection of conflicts will not work in some cases (in that case you will
+# need to first remove all links to a given package and then re-create them
+# in order to detect all conflicts reliably). (Use an empty string to disable
+# or a non-empty string to enable; initial setting is "fast_mode=""".)
+#
+fast_mode=""
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+self="genopt"
+
+version="2.1.0 (09-Nov-1998)"
+
+header="This is \"$self\" of \"Build'n'Play\" (BnP) version $version"
+
+##
+## Internal configuration constants (needed for set operations
+## on lists of subdirs):
+##
+
+PKG=pkg
+ARC=arc
+BIN=bin
+INF=info
+LIB=lib
+MAN=man
+TEX=texmf
+
+COMMON_SUBDIRS="$BIN etc include $INF $LIB $MAN shlib $TEX xad"
+
+LEGAL_SUBDIRS="$PKG $ARC $COMMON_SUBDIRS"
+
+LAYER_SUBDIRS="$PKG $COMMON_SUBDIRS"
+BRIDGE_SUBDIRS="$PKG $LIB $TEX"
+
+INSTALL_SUBDIRS="$ARC $COMMON_SUBDIRS"
+MINIMAL_SUBDIRS="$ARC $BIN"
+
+##
+## One-line descriptions of the supported subdirectories:
+##
+
+INFO_pkg="Package Tree Root Dir (shorthand path)"
+INFO_arc="Archive Dir (original distribution & adjusted config files)"
+INFO_bin="Public Binaries (executables)"
+INFO_etc="Configuration (rc-files, etc. pp.)"
+INFO_include="Include Files (C header files)"
+INFO_info="GNU Info Files (Info output from Texinfo)"
+INFO_lib="Library Dir (package-private config-files & binaries)"
+INFO_man="Unix Manual-Pages (NROFF format)"
+INFO_shlib="Shared Libraries (static AR or dynamic loadable library files)"
+INFO_texmf="TeX & METAFONT files, searched via kpathsea library"
+INFO_xad="X11 Application-Default Files (X resources)"
+
+##
+## Initialization of other constants:
+##
+
+TEMP_LINK=""
+
+PUBLIC_TEMP="/tmp"
+
+TEMPORARY_BASE="$self.$$"
+
+TEMPORARY_FILES="$PUBLIC_TEMP/$TEMPORARY_BASE"
+
+INTERCEPT="echo '' >&2; echo '***BREAK' >&2; quit 1"
+
+OVERRIDE="echo '' >&2; stderr \"Overriding semaphore '\$lockfile'...\"; \
+rm -f \$lockfile"
+
+if [ "x$verbose" = "x" ]
+then
+    PRINT=':'
+else
+    PRINT='echo "$1"'
+fi
+
+##
+## Subroutine definitions:
+##
+
+stdout ()
+{
+    if [ "x$verbose" != "x" ]
+    then
+        echo "$@"
+    fi
+}
+
+stderr ()
+{
+    echo "$self: $@" >&2
+}
+
+quit ()
+{
+    rm -f "$TEMPORARY_FILES."* 2>/dev/null
+    if [ "x$TEMP_LINK" != "x" ]
+    then
+        rm -f "$TEMP_LINK" 2>/dev/null
+    fi
+    exit $1
+}
+
+perform ()
+{
+    "$@"
+    if [ $? -ne 0 ]
+    then
+        stderr "Command '$@' failed!"
+        quit 1
+    fi
+}
+
+print_usage ()
+{
+    cat << VERBATIM
+
+$header
+
+    Usage:   $self [<options>] <target>
+
+where <options> is one or more of:
+
+    -p path  -  prefix of the software package installation hierarchy and
+                symbolic link access layer maintained by this tool (e.g. /opt)
+                default: "$DEFAULT_LOGICAL_ROOT"
+    -s path  -  path (absolute or relative to prefix) to the physical software
+                package installation subtree below prefix (e.g. /opt/packages)
+                default: "$DEFAULT_PHYSICAL_ROOT"
+    -d dirs  -  comma separated list of subdirectories to process out of:
+                $LEGAL_SUBDIRS
+    -c       -  create an installation subtree for a new software package
+    -f       -  enforce the override of foreign links in case of conflicts
+    -r       -  remove all links to target in selected subdirectories
+    -v       -  print version information and exit
+    -h       -  print this help screen and exit
+
+and <target> is the path to some software package's installation subtree.
+
+VERBATIM
+}
+
+absolute ()
+{
+    case "$1" in
+      /*) path="$1" ;;
+      *)  path="`pwd`/$1" ;;
+    esac
+}
+
+normalize ()
+{
+    path="$1"
+    case "$path" in
+      /*) flag="/" ;;
+      *)  flag=""  ;;
+    esac
+    trim="/`echo \"$path\" | sed -e \
+        's|///*|/|g; \
+         s|/\./\(\./\)*|/|g; \
+         s|^\./||; \
+         s|/\.$||; \
+         s|^/||; \
+         s|/$||; \
+         s|^\.$||'`/"
+    path=""
+    while [ "x$trim" != "x$path" ]
+    do
+        path="$trim"
+        trim="`echo \"$path\" | sed -e \
+            's|/\.*[^\./][^/]*/\.\./|/|g; s|/\.\.\.\.*/\.\./|/|g'`"
+    done
+    trim="`echo \"$trim\" | sed -e 's|^/||; s|/$||'`"
+    path="$flag$trim"
+}
+
+make_dir ()
+{
+    normalize "$1"
+    if [ ! -d "$path" ]  #  SunOS's sh/test doesn't know -e!
+    then
+        if [ -f "$path" ]
+        then
+            stderr "Can't 'mkdir $path': File already exists!"
+            quit 1
+        fi
+        dir="$flag"
+        path="$trim"
+        while [ "x$path" != "x" ]
+        do
+            item="`echo \"$path\" | sed -e  's|/.*$||'`"
+            path="`echo \"$path\" | sed -ne 's|^[^/]*/||p'`"
+            #
+            dir="$dir$item"
+            if [ ! -d "$dir" ]
+            then
+                perform mkdir "$dir"
+            fi
+            dir="$dir/"
+        done
+    fi
+}
+
+probe_ls ()
+{
+    file="$TEMPORARY_FILES.link"
+    link="$self -> $version"
+    #
+    perform rm -f "$file"
+    perform ln -s "$link" "$file"
+    #
+    head="`/bin/ls -l \"$file\" | sed -e  \"s|^.*${file}||\"`"
+    tail="`/bin/ls -l \"$file\" | sed -e  \"s|^.*${link}||\"`"
+    head="`echo \"$head\"       | sed -e  \"s|${link}.*\$||\"`"
+    #
+    temp="`/bin/ls -l \"$file\" | sed -ne \"s|^.*${file}${head}||p\" | \
+                                  sed -e  \"s|${tail}\$||\"`"
+    #
+    rm -f "$file"
+    #
+    if [ "x$temp" != "x$link" ]
+    then
+        stderr "Can't figure out how to read symbolic links!"
+        quit 1
+    fi
+}
+
+probe_h ()
+{
+    file="$TEMPORARY_FILES.test"
+    link="$TEMPORARY_FILES.link"
+    cat >"$file" <<VERBATIM
+#!/bin/sh
+rm -f "$link"
+ln -s dummy "$link"
+if [ $? -eq 0 ]
+then
+    if [ -h "$link" ]
+    then
+        exit 0
+    fi
+fi
+exit 1
+VERBATIM
+    /bin/sh "$file" 2>/dev/null
+    if [ $? -ne 0 ]
+    then
+        stderr "Sorry, your system does not fully support symbolic links!"
+        quit 1
+    fi
+    rm -f "$file"
+    rm -f "$link"
+}
+
+probe_s ()
+{
+    file="$TEMPORARY_FILES.test"
+    cat >"$file" <<VERBATIM
+#!/bin/sh
+if [ -s /bin/sh ]
+then
+    exit 0
+fi
+exit 1
+VERBATIM
+    if /bin/sh "$file" 2>/dev/null
+    then
+        test_s=-s
+    else
+        test_s=-r
+    fi
+    rm -f "$file"
+}
+
+probe_x ()
+{
+    file="$TEMPORARY_FILES.test"
+    cat >"$file" <<VERBATIM
+#!/bin/sh
+if [ -x / ] || [ -x /bin ] || [ -x /bin/sh ]
+then
+    exit 0
+fi
+exit 1
+VERBATIM
+    if /bin/sh "$file" 2>/dev/null
+    then
+        test_x=-x
+    else
+        test_x=-r
+    fi
+    rm -f "$file"
+}
+
+writable ()
+{
+    dir="$1"
+    if [ -d "$dir" ]
+    then
+        TEMP_LINK="$dir/$TEMPORARY_BASE.link"
+        rm -f "$TEMP_LINK" 2>/dev/null
+        ln -s dummy "$TEMP_LINK" 2>/dev/null
+        if [ $? -ne 0 ]
+        then
+            stderr "Directory '$dir' is not writable!"
+            quit 1
+        fi
+        rm -f "$TEMP_LINK"
+        TEMP_LINK=""
+    else
+        stderr "Directory '$dir' does not exist!"
+        quit 1
+    fi
+}
+
+check_logical ()
+{
+    case "$LOGICAL_ROOT" in
+      /*) # absolute path
+          ;;
+      *)  # relative path
+          stderr "The access layer path '$LOGICAL_ROOT' must be absolute!"
+          quit 1
+          ;;
+    esac
+}
+
+check_dirlist ()
+{
+    dirlist="$1"
+    #
+    # Check for illegal characters:
+    #
+    diff="`echo \"$dirlist\" | tr -d ',a-zA-Z'`"
+    if [ "x$diff" != "x" ]
+    then
+        print_usage
+        stderr "Illegal characters found in argument of option '-d'!"
+        quit 1
+    fi
+    #
+    # Check for illegal subdirectories:
+    #
+    dirlist="`echo \"$dirlist\" | sed -e 's|,| |g'`"
+    for dir in $dirlist
+    do
+        found=""
+        for ref in $LEGAL_SUBDIRS
+        do
+            if [ "x$dir" = "x$ref" ]
+            then
+                found=yes
+                break
+            fi
+        done
+        if [ "x$found" = "x" ]
+        then
+            print_usage
+            stderr "Illegal item '$dir' found in argument of option '-d'!"
+            quit 1
+        fi
+    done
+    #
+    # Accumulate directories:
+    #
+    if [ "x$PROCESS_SUBDIRS" = "x" ]
+    then
+        PROCESS_SUBDIRS="$dirlist"
+    else
+        PROCESS_SUBDIRS="$PROCESS_SUBDIRS $dirlist"
+    fi
+}
+
+sub_in ()
+{
+    subset="$1"
+    for ref in $subset
+    do
+        if [ "x$sub" = "x$ref" ]
+        then
+            return 0
+        fi
+    done
+    return 1
+}
+
+print_done ()
+{
+    count="$1"
+    if [ "$count" -eq 0 ]
+    then
+        count="NO ${2}s"
+    elif [ "$count" -eq 1 ]
+    then
+        count="1 $2"
+    else
+        count="$count ${2}s"
+    fi
+    stdout "            Done: $count $3."
+}
+
+passeer_semaphore ()
+{
+    trap '' 2
+    lockfile="$1"
+    while :
+    do
+        #
+        # Wait for semaphore to be released (if set):
+        #
+        if [ -f "$lockfile" ]
+        then
+            trap "$OVERRIDE" 2
+            while [ -f "$lockfile" ]
+            do
+                stderr "Waiting for semaphore '$lockfile'..."
+                stderr \
+                "(Press 'Ctrl-C' in case of a stale semaphore or a gridlock!)"
+                sleep 5
+            done
+            trap '' 2
+        fi
+        #
+        # When semaphore is gone, create own one:
+        #
+        perform echo "$$" >>"$lockfile"
+        #
+        # (Note that the ">>" is essential!!)
+        #
+        # Check wether semaphore is our's or if it was created
+        # in the meantime by another process (race condition!):
+        #
+        proc_id="`cat \"$lockfile\"`"
+        #
+        # Loop if semaphore isn't our's:
+        #
+        if [ "x$proc_id" = "x$$" ]
+        then
+            break
+        fi
+    done
+}
+
+verlaat_semaphore ()
+{
+    rm -f "$1"
+    trap "$INTERCEPT" 2
+}
+
+expand_symlinks ()
+{
+    accu=""
+    absolute "$1"
+    normalize "$path"
+    path="$trim"
+    while [ "x$path" != "x" ]
+    do
+        item="`echo \"$path\" | sed -e  's|/.*$||'`"
+        path="`echo \"$path\" | sed -ne 's|^[^/]*/||p'`"
+        #
+        temp="$accu/$item"
+        if [ "x$item" != "x.." ] && [ -h "$temp" ]
+        then
+            link="`/bin/ls -l \"$temp\" | \
+                sed -ne \"s|^.*${temp}${head}||p\" | \
+                sed -e  \"s|${tail}\$||\"`"
+            #
+            case "$link" in
+              /*) accu="" ;;
+            esac
+            #
+            normalize "$link/$path"
+            path="$trim"
+        else
+            accu="$temp"
+        fi
+    done
+    normalize "/$accu"
+}
+
+read_link ()
+{
+    temp="$1/$2"
+    raw="`/bin/ls -l \"$temp\" | \
+        sed -ne \"s|^.*${temp}${head}||p\" | \
+        sed -e  \"s|${tail}\$||\"`"
+    case "$raw" in
+      /*) link="$raw" ;;
+      *)  link="$1/$raw" ;;
+    esac
+    normalize "$link"
+    link="$path"
+}
+
+create_link ()
+{
+    CREATE=1
+    echo "create '$OFFSET' '$object' '$BACKUP' '$relative'" >>"$TEMP_FILE.c"
+    #
+    if [ "x$OFFSET" != "x" ]
+    then
+        if [ ! -d "$base" ]
+        then
+            make_dir "$base"
+        fi
+    fi
+}
+
+remove_link ()
+{
+    REMOVE=1
+    echo "remove '$OFFSET' '$object' '$raw'" >>"$TEMP_FILE.r"
+}
+
+failed_create_link ()
+{
+    CREATE=1
+    echo "failed '$OFFSET' '$object' '$BACKUP' '$relative' '$raw'" \
+    >>"$TEMP_FILE.c"
+}
+
+failed_remove_link ()
+{
+    REMOVE=1
+    echo "failed '$OFFSET' '$object' '$BACKUP' '$relative' '$raw'" \
+    >>"$TEMP_FILE.r"
+}
+
+check_link ()
+{
+    object="`echo \"$1\" | sed -e 's|//*$||; s|^.*/||'`"
+    #
+    # More parameters are passed in the following global variables:
+    #
+    # LINK_SUBDIR, OFFSET, BACKUP, TEMP_FILE, REMOVE, CREATE,
+    # active, absolute, relative.
+    #
+    # (Note that "active" means wether or not a link should exist
+    # which points to the target file or directory in question!)
+    #
+    found=1  #  (this is return code, not boolean!)
+    #
+    # ("FOUND" = valid targets counter, "found" = correct link found flag.)
+    #
+    # Check if link exists and wether it points to correct destination:
+    #
+    base="${LINK_SUBDIR}${OFFSET}"
+    sample="$base/$object"
+    #
+    if [ -h "$sample" ]
+    then
+        read_link "$base" "$object"
+        if [ "x$link" = "x$absolute" ]
+        then
+            found=0
+            #
+            if [ "x$active" = "x" ]
+            then
+                #
+                # If link shouldn't exist then remove it:
+                #
+                remove_link
+            else
+                #
+                # Since link exists (and should) append target to the list
+                # of active targets (for index file and final summary):
+                #
+                echo "$relative" >>"$TEMP_FILE.a"
+            fi
+        else
+            # We found the link, but it points to somewhere else!
+            #
+            if [ "x$active" = "x" ]
+            then
+                if [ "x$REMOVE_FLAG" != "x" ]
+                then
+                    if [ "x$FORCE_FLAG" = "x" ]
+                    then
+                        failed_remove_link
+                    else
+                        remove_link
+                    fi
+                fi
+            else
+                if [ "x$FORCE_FLAG" = "x" ]
+                then
+                    failed_create_link
+                else
+                    remove_link
+                    create_link
+                fi
+            fi
+        fi
+    else
+        if [ -f "$sample" -o -d "$sample" ]
+        then
+            raw=""
+            if [ "x$active" = "x" ]
+            then
+                failed_remove_link
+            else
+                failed_create_link
+            fi
+        else
+            if [ "x$active" != "x" ]
+            then
+                create_link
+            fi
+        fi
+    fi
+    return $found
+}
+
+check_conditions ()
+{
+    valid=1  #  (this is return code, not boolean!)
+    #
+    # Maintain links only for existing, readable and non-empty files:
+    #
+    if [ -f "$absolute" -a -r "$absolute" -a $test_s "$absolute" ]
+    then
+        valid=0
+        #
+        # Check additional conditions for special cases:
+        #
+        if [ "x$sub" = "x$BIN" ]
+        then
+            if [ ! $test_x "$absolute" ]
+            then
+                valid=1  #  don't link files which aren't executable
+            fi
+        elif [ "x$sub" = "x$INF" ]
+        then
+            if [ "x$1" = "xdir" ]
+            then
+                valid=1
+            fi
+        fi
+    fi
+    return $valid
+}
+
+check_file ()
+{
+    absolute="${SCAN_SUBDIR}${OFFSET}/$1"
+    #
+    if check_conditions "$1" #  check wether it's a valid target file
+    then
+        FOUND="`expr $FOUND + 1`"
+        #
+        relative="$PHYSICAL_TO_TARGET/${sub}${OFFSET}/$1"
+        #
+        if [ "x$REMOVE_FLAG" = "x" ]
+        then
+            # Create the link if necessary:
+            #
+            active=yes
+            #
+            if [ "x$fast_mode" = "x" ]  #  standard mode:
+            then
+                check_link "$absolute"  #  create the link if necessary
+            else
+                verify="`grep \"^${relative}\$\" <\"$TEMP_FILE.o\"`"
+                if [ "x$verify" = "x" ]     #  not found in "TEMP_FILE.o":
+                then
+                    check_link "$absolute"  #  create the link if necessary!
+                else
+                    # We trust the "TEMP_FILE.o" that the link exists:
+                    #
+                    echo "$relative" >>"$TEMP_FILE.a"
+                fi
+            fi
+        else
+            # Remove the link if it exists:
+            #
+            active=""
+            #
+            if [ "x$fast_mode" = "x" ]  #  standard mode (or else we trust):
+            then
+                verify="`grep \"^${relative}\$\" <\"$TEMP_FILE.o\"`"
+                if [ "x$verify" = "x" ]
+                then
+                    # We didn't remove this link yet in Pass 1a!
+                    # (I.e., we found an inconsistency, or a new file!)
+                    #
+                    check_link "$absolute"  #  remove the link if it exists!
+                fi
+            fi
+        fi
+    fi
+}
+
+##
+## Remove all temporary files in case of CTRL-C (user interrupt):
+##
+
+trap "$INTERCEPT" 2
+
+##
+## Check wether the public temporary directory is writable by current user:
+##
+
+writable "$PUBLIC_TEMP"
+
+##
+## Check wether "test" supports the "-h" test:
+##
+
+probe_h
+
+##
+## Determine what characters /bin/ls adds before and after symbolic links:
+##
+
+probe_ls
+
+##
+## Process the command line options and issue a usage where necessary:
+##
+
+LOGICAL_ROOT="$DEFAULT_LOGICAL_ROOT"
+PHYSICAL_ROOT="$DEFAULT_PHYSICAL_ROOT"
+PROCESS_SUBDIRS=""
+CREATE_SUBDIRS=""
+REMOVE_FLAG=""
+CREATE_FLAG=""
+FORCE_FLAG=""
+
+if [ $# -eq 0 ]
+then
+    print_usage
+    quit 1
+else
+    while [ $# -ne 0 ]
+    do
+        case "$1" in
+          -p*)
+              LOGICAL_ROOT="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$LOGICAL_ROOT" = "x" -a $# -gt 0 ]
+              then
+                  LOGICAL_ROOT="$1"
+                  shift
+              fi
+              if [ "x$LOGICAL_ROOT" = "x" ]
+              then
+                  print_usage
+                  stderr "Argument for option '-p' is missing or empty!"
+                  quit 1
+              else
+                  check_logical
+              fi
+              ;;
+          -s*)
+              PHYSICAL_ROOT="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$PHYSICAL_ROOT" = "x" -a $# -gt 0 ]
+              then
+                  PHYSICAL_ROOT="$1"
+                  shift
+              fi
+              if [ "x$PHYSICAL_ROOT" = "x" ]
+              then
+                  print_usage
+                  stderr "Argument for option '-s' is missing or empty!"
+                  quit 1
+              fi
+              ;;
+          -d*)
+              DIRECTORY_LIST="`echo \"$1\" | cut -c3-`"
+              shift
+              if [ "x$DIRECTORY_LIST" = "x" -a $# -gt 0 ]
+              then
+                  DIRECTORY_LIST="$1"
+                  shift
+              fi
+              if [ "x$DIRECTORY_LIST" != "x" ]
+              then
+                  check_dirlist "$DIRECTORY_LIST"
+              fi
+              ;;
+          -c)
+              CREATE_FLAG=YES
+              shift
+              ;;
+          -f)
+              FORCE_FLAG=YES
+              shift
+              ;;
+          -r)
+              REMOVE_FLAG=YES
+              shift
+              ;;
+          -v)
+              echo "$header"
+              quit 1
+              ;;
+          -h)
+              print_usage
+              quit 1
+              ;;
+          --)
+              shift
+              break
+              ;;
+          -*)
+              print_usage
+              stderr "Illegal option '$1' encountered!"
+              quit 1
+              ;;
+          *)
+              break
+              ;;
+        esac
+    done
+fi
+
+##
+## Some cleanup:
+##
+
+if [ "x$PROCESS_SUBDIRS" = "x" ]
+then
+    if [ "x$CREATE_FLAG" = "x" ]
+    then
+        PROCESS_SUBDIRS="$LAYER_SUBDIRS"
+    else
+        CREATE_SUBDIRS="$INSTALL_SUBDIRS"
+        PROCESS_SUBDIRS="$BRIDGE_SUBDIRS"
+    fi
+else
+    if [ "x$CREATE_FLAG" != "x" ]
+    then
+        CREATE_SUBDIRS="$PROCESS_SUBDIRS $MINIMAL_SUBDIRS"
+        PROCESS_SUBDIRS="$PROCESS_SUBDIRS $PKG"
+    fi
+fi
+
+##
+## Purify the path to the symbolic link access layer:
+##
+
+normalize "$LOGICAL_ROOT"
+LOGICAL_ROOT="$path"
+
+expand_symlinks "$LOGICAL_ROOT"
+TRUE_LOGICAL_ROOT="$path"
+
+##
+## Check wether the symbolic link access layer directory was set to "/":
+##
+
+if [ "x$TRUE_LOGICAL_ROOT" = "x" -o "x$TRUE_LOGICAL_ROOT" = "x/" ]
+then
+    stderr "The access layer root directory must be different from '/'!"
+    quit 1
+fi
+
+##
+## Check the existence of the installation subtree UNLESS it is to be created:
+##
+
+case "$PHYSICAL_ROOT" in
+  /*) # absolute path
+      ;;
+  *)  # relative path
+      PHYSICAL_ROOT="$TRUE_LOGICAL_ROOT/$PHYSICAL_ROOT" # from TRUE_ for speed
+      ;;
+esac
+
+normalize "$PHYSICAL_ROOT"
+PHYSICAL_ROOT="$path"
+
+if [ "x$CREATE_FLAG" = "x" -a ! -d "$PHYSICAL_ROOT" ]
+then
+    stderr "Installation directory '$PHYSICAL_ROOT' doesn't exist!"
+    quit 1
+fi
+
+expand_symlinks "$PHYSICAL_ROOT"
+TRUE_PHYSICAL_ROOT="$path"
+
+##
+## Check wether the physical installation directory was set to "/":
+##
+
+if [ "x$TRUE_PHYSICAL_ROOT" = "x" -o "x$TRUE_PHYSICAL_ROOT" = "x/" ]
+then
+    stderr "The physical installation directory must be different from '/'!"
+    quit 1
+fi
+
+##
+## Check wether the physical root dir lies within the logical dir tree:
+##
+
+diff="`echo \"$TRUE_PHYSICAL_ROOT\" | sed -e \"s|^${TRUE_LOGICAL_ROOT}/..*||\"`"
+
+if [ "x$diff" != "x" ]
+then
+    stderr "The installation directory"
+    stderr "'$TRUE_PHYSICAL_ROOT'"
+    stderr "must lie within the symbolic link access layer tree"
+    stderr "'$TRUE_LOGICAL_ROOT'!"
+    quit 1
+fi
+
+##
+## Check the number (and contents) of target directories:
+##
+
+if [ $# -eq 0 ]
+then
+    print_usage
+    stderr "No target directory specified!"
+    quit 1
+elif [ $# -gt 1 ]
+then
+    print_usage
+    stderr "More than one target directory specified!"
+    quit 1
+elif [ "x$1" = "x" ]
+then
+    stderr "A null target directory is not allowed!"
+    quit 1
+fi
+
+##
+## Check the existence of the target directory UNLESS it is to be created:
+##
+
+absolute "$1"
+normalize "$path"
+TARGET_ROOT="$path"
+
+if [ "x$CREATE_FLAG" = "x" -a ! -d "$TARGET_ROOT" ]
+then
+    stderr "Target directory '$TARGET_ROOT' doesn't exist!"
+    quit 1
+fi
+
+expand_symlinks "$TARGET_ROOT"
+TRUE_TARGET_ROOT="$path"
+
+##
+## Check wether the target directory was set to "/":
+##
+
+if [ "x$TRUE_TARGET_ROOT" = "x" -o "x$TRUE_TARGET_ROOT" = "x/" ]
+then
+    stderr "The target directory must be different from '/'!"
+    quit 1
+fi
+
+##
+## Check wether the target dir tree lies within the physical dir tree:
+##
+
+diff="`echo \"$TRUE_TARGET_ROOT\" | sed -e \"s|^${TRUE_PHYSICAL_ROOT}/..*||\"`"
+
+if [ "x$diff" != "x" ]
+then
+    stderr "The target directory"
+    stderr "'$TRUE_TARGET_ROOT'"
+    stderr "must lie within the installation directory tree"
+    stderr "'$TRUE_PHYSICAL_ROOT'!"
+    quit 1
+fi
+
+##
+## Create the symbolic link access layer directory tree (if necessary)
+## and check if it's writable:
+##
+
+make_dir "$TRUE_LOGICAL_ROOT"
+writable "$TRUE_LOGICAL_ROOT"
+
+for sub in $LAYER_SUBDIRS
+do
+    make_dir "$TRUE_LOGICAL_ROOT/$sub"
+    writable "$TRUE_LOGICAL_ROOT/$sub"
+done
+
+##
+## Create the installation and target subtrees if so requested:
+##
+
+if [ "x$CREATE_FLAG" != "x" ]
+then
+    make_dir "$TRUE_PHYSICAL_ROOT"
+    for sub in $INSTALL_SUBDIRS
+    do
+        if sub_in "$CREATE_SUBDIRS"
+        then
+            make_dir "$TRUE_TARGET_ROOT/$sub"
+        fi
+    done
+fi
+
+##
+## Determine the relative paths for getting
+## from "TRUE_LOGICAL_ROOT"  to "TRUE_PHYSICAL_ROOT" and
+## from "TRUE_PHYSICAL_ROOT" to "TRUE_TARGET_ROOT":
+## (Note that "LOGICAL_TO_TARGET" would be equivalent to
+## "$LOGICAL_TO_PHYSICAL/$PHYSICAL_TO_TARGET".)
+##
+
+LOGICAL_TO_PHYSICAL="`echo \"$TRUE_PHYSICAL_ROOT\" | \
+    sed -e \"s|^${TRUE_LOGICAL_ROOT}/||\"`"
+
+PHYSICAL_TO_TARGET="`echo \"$TRUE_TARGET_ROOT\" | \
+    sed -e \"s|^${TRUE_PHYSICAL_ROOT}/||\"`"
+
+##
+## Check wether "test" supports the "-s" and "-x" tests:
+##
+
+probe_s
+
+sub="$BIN"
+if sub_in "$PROCESS_SUBDIRS"
+then
+    probe_x
+fi
+
+##
+## Prepare processing:
+##
+
+INDEX_BASE="$LOGICAL_ROOT/.$self.L"    # not from TRUE_, for display!
+LOG_FILE="$LOGICAL_ROOT/.$self.errors" # dito
+LOG_LOCK="$LOG_FILE.lock"
+
+if [ "x$CREATE_FLAG" = "x" ]
+then
+    SUBSET_OF_SUBDIRS="$LAYER_SUBDIRS"
+else
+    SUBSET_OF_SUBDIRS="$BRIDGE_SUBDIRS"
+fi
+
+##
+## Begin of processing:
+##
+
+stdout
+stdout "$header"
+stdout
+stdout "SCANNING $TARGET_ROOT"
+
+##
+## Write header to log file (semi-critical section):
+##
+
+passeer_semaphore "$LOG_LOCK"
+
+echo \
+"------------------------------------------------------------------------------" >>"$LOG_FILE"
+echo "`date` - \"$self\" $version PID $$" >>"$LOG_FILE"
+echo \
+"------------------------------------------------------------------------------" >>"$LOG_FILE"
+echo "  SCAN: $TARGET_ROOT" >>"$LOG_FILE"
+echo "  DIRS: $PROCESS_SUBDIRS" >>"$LOG_FILE"
+
+verlaat_semaphore "$LOG_LOCK"
+
+##
+## Processing loop:
+##
+
+for sub in $SUBSET_OF_SUBDIRS
+do
+    if sub_in "$PROCESS_SUBDIRS"
+    then
+        BASE_SUBDIR="$LOGICAL_ROOT/$sub" # not from TRUE_, for display!
+        LINK_SUBDIR="$TRUE_LOGICAL_ROOT/$sub"
+        SCAN_SUBDIR="$TRUE_TARGET_ROOT/$sub"
+        #
+        INDEX_FILE="$INDEX_BASE.$sub"
+        LOCK_FILE="$INDEX_FILE.lock"
+        TEMP_FILE="$TEMPORARY_FILES.$sub"
+        #
+        perform rm -f "$TEMP_FILE.o"  ##  o=old links
+        perform rm -f "$TEMP_FILE.a"  ##  a=active links
+        perform rm -f "$TEMP_FILE.r"  ##  r=remove command list
+        perform rm -f "$TEMP_FILE.c"  ##  c=create command list
+        perform rm -f "$TEMP_FILE.b"  ##  b=batch command file
+        perform rm -f "$TEMP_FILE.i"  ##  i=index file
+        perform rm -f "$TEMP_FILE.l"  ##  l=log file
+        #
+        perform touch "$TEMP_FILE.o"
+        perform touch "$TEMP_FILE.a"
+        perform touch "$TEMP_FILE.r"
+        perform touch "$TEMP_FILE.c"
+        perform touch "$TEMP_FILE.b"
+        perform touch "$TEMP_FILE.i"
+        perform touch "$TEMP_FILE.l"
+        #
+        FOUND=0
+        REMOVE=0
+        CREATE=0
+        #
+        OFFSET=""
+        BACKUP="../"
+        #
+        stdout
+        stdout "  PROCESSING $BASE_SUBDIR"
+        eval "info=\$INFO_${sub}"
+        stdout "    [$info]"
+        #
+        stdout "    PASS 1: Scanning for valid targets..."
+        #
+        if sub_in "$BRIDGE_SUBDIRS"
+        then
+            #
+            # Handle "bridge" subdirs separately:
+            #
+            if [ "x$sub" = "x$PKG" ]    ##  handle special case PKG
+            then
+                indicator="$TRUE_TARGET_ROOT/$ARC"
+                absolute="$TRUE_TARGET_ROOT"
+                relative="$PHYSICAL_TO_TARGET"
+            else                        ##  handle "bridge" subdirs
+                indicator="$SCAN_SUBDIR"
+                absolute="$SCAN_SUBDIR"
+                relative="$PHYSICAL_TO_TARGET/$sub"
+            fi
+            #
+            # Check wether target subdirectory exists and hence wether
+            # the "bridge" link should exist (be "active") or not:
+            #
+            active=""
+            if [ -d "$indicator" ]
+            then
+                FOUND=1
+                if [ "x$REMOVE_FLAG" = "x" ]
+                then
+                    active=yes
+                fi
+            fi
+            #
+            if check_link "$TRUE_TARGET_ROOT"
+            then
+                #
+                # Append link to list of old links for final summary:
+                #
+                echo "$relative" >"$TEMP_FILE.o"
+            fi
+        else
+            #
+            # Now handle all "non-bridge" (or "normal") subdirs:
+            #
+            # Read index file (critical section!):
+            #
+            passeer_semaphore "$LOCK_FILE"
+            #
+            touch "$INDEX_FILE"
+            grep "^${PHYSICAL_TO_TARGET}/${sub}/." <"$INDEX_FILE" \
+                >"$TEMP_FILE.o"
+            #
+            verlaat_semaphore "$LOCK_FILE"
+            #
+            # PASS 1a: Determine which of the old links are obsolete:
+            #
+            for relative in `cat "$TEMP_FILE.o"`
+            do
+                absolute="$TRUE_PHYSICAL_ROOT/$relative"
+                #
+                valid=1  #  (this is return code, not boolean!)
+                #
+                if [ "x$REMOVE_FLAG" = "x" -a -d "$SCAN_SUBDIR" ]
+                then
+                    check_conditions  #  check wether it's a valid target file
+                fi
+                #
+                if [ $valid -ne 0 ] # remove link if target isn't valid anymore
+                then
+                    if [ "x$sub" = "x$MAN" ]
+                    then
+                        # The following solution is valid for ALL subdirs
+                        # (i.e., the test for subdir "MAN" can be omitted!),
+                        # but we make things run a little faster this way!
+                        #
+                        OFFSET="`echo \"$relative\" | \
+                            sed -e \"s|^${PHYSICAL_TO_TARGET}/${sub}||; \
+                            s|/[^/]*\$||\"`"
+                        BACKUP="../`echo \"$OFFSET\" | \
+                            sed -e 's|[^/]||g; s|/|../|g'`"
+                    fi
+                    #
+                    active=""
+                    check_link "$absolute"  #  remove the link
+                fi
+            done
+            #
+            # PASS 1b: Scan the target subdirectory for valid target files:
+            #
+            if [ -d "$SCAN_SUBDIR" ]
+            then
+                if [ "x$sub" = "x$MAN" ]  ##  handle special case MAN:
+                then
+                    for man_type in man cat # man takes precedence over cat!
+                    do
+                        for man_sect in 1 2 3 4 5 6 7 8 9
+                        do
+                            OFFSET="/${man_type}${man_sect}"
+                            BACKUP="../../"
+                            if [ -d "${SCAN_SUBDIR}${OFFSET}" ]
+                            then
+                                condition="s|\\.${man_sect}\$||p"
+                                list="`/bin/ls -1 \"${SCAN_SUBDIR}${OFFSET}\"|\
+                                    sed -ne \"$condition\"`"
+                                for file in $list
+                                do
+                                    check_file "$file.$man_sect"
+                                done
+                            fi
+                        done
+                    done
+                else
+                    #
+                    # Handle all other subdirectories:
+                    #
+                    for file in `/bin/ls -1 "$SCAN_SUBDIR"`
+                    do
+                        check_file "$file"
+                    done
+                fi
+            fi
+        fi
+        #
+        print_done "$FOUND" "target" "found"
+        #
+        stdout "    PASS 2: Removing all obsolete links..."
+        #
+        if [ "$REMOVE" -gt 0 ]
+        then
+            cat >"$TEMP_FILE.b" <<VERBATIM
+#!/bin/sh
+REL='$LOGICAL_TO_PHYSICAL'
+BAS='$BASE_SUBDIR'
+DIR='$LINK_SUBDIR'
+LOG='$TEMP_FILE.l'
+info ()
+{
+    $PRINT
+}
+failed ()
+{
+    file="\${BAS}\${1}/\$2"
+    link="\${3}\${REL}/\$4"
+    text="\$file -> \$5"
+    info "            \$text [CONFLICT]"
+    echo "FAILED: remove \$text (\$link)" >>"\$LOG"
+}
+remove ()
+{
+    file="\${BAS}\${1}/\$2"
+    text="\$file -> \$3"
+    file="\${DIR}\${1}/\$2"
+    rm -f "\$file" >/dev/null 2>/dev/null
+    if [ \$? -eq 0 ]
+    then
+        info "            \$text [OK]"
+        echo "REMOVE: \$text" >>"\$LOG"
+    else
+        info "            \$text [ERROR]"
+        echo "FAILED: remove \$text" >>"\$LOG"
+    fi
+}
+VERBATIM
+            cat "$TEMP_FILE.r" >>"$TEMP_FILE.b"
+            /bin/sh "$TEMP_FILE.b"
+            #
+            REMOVE="`grep '^REMOVE:' \"$TEMP_FILE.l\" | \
+                wc -l | sed -e 's| ||g'`"
+        fi
+        #
+        print_done "$REMOVE" "link" "removed"
+        #
+        stdout "    PASS 3: Creating new links..."
+        #
+        if [ "$CREATE" -gt 0 ]
+        then
+            cat >"$TEMP_FILE.b" <<VERBATIM
+#!/bin/sh
+REL='$LOGICAL_TO_PHYSICAL'
+BAS='$BASE_SUBDIR'
+DIR='$LINK_SUBDIR'
+LOG='$TEMP_FILE.l'
+info ()
+{
+    $PRINT
+}
+failed ()
+{
+    file="\${BAS}\${1}/\$2"
+    link="\${3}\${REL}/\$4"
+    text="\$file -> \$5"
+    info "            \$text [CONFLICT]"
+    text="\$file -> \$link"
+    echo "FAILED: create \$text (\$5)" >>"\$LOG"
+}
+create ()
+{
+    file="\${BAS}\${1}/\$2"
+    link="\${3}\${REL}/\$4"
+    text="\$file -> \$link"
+    file="\${DIR}\${1}/\$2"
+    ln -s "\$link" "\$file" 2>/dev/null
+    if [ \$? -eq 0 ]
+    then
+        echo "\$4" >>'$TEMP_FILE.a'
+        info "            \$text [OK]"
+        echo "CREATE: \$text" >>"\$LOG"
+    else
+        info "            \$text [ERROR]"
+        echo "FAILED: create \$text" >>"\$LOG"
+    fi
+}
+VERBATIM
+            cat "$TEMP_FILE.c" >>"$TEMP_FILE.b"
+            /bin/sh "$TEMP_FILE.b"
+            #
+            CREATE="`grep '^CREATE:' \"$TEMP_FILE.l\" | \
+                wc -l | sed -e 's| ||g'`"
+        fi
+        #
+        print_done "$CREATE" "link" "created"
+        #
+        # "bridge" subdirectories don't have index files:
+        #
+        sub_in "$BRIDGE_SUBDIRS"
+        if [ $? -ne 0 ]
+        then
+            #
+            # Write new index file (critical section!):
+            #
+            passeer_semaphore "$LOCK_FILE"
+            #
+            grep -v "^${PHYSICAL_TO_TARGET}/${sub}/." <"$INDEX_FILE" \
+                >"$TEMP_FILE.i"
+            rm -f "$INDEX_FILE"
+            cat "$TEMP_FILE.a" >>"$TEMP_FILE.i"
+            sort <"$TEMP_FILE.i" >"$INDEX_FILE"  #  sort mainly for esthetics!
+            #
+            verlaat_semaphore "$LOCK_FILE"
+        fi
+        #
+        # Write to log file (semi-critical section):
+        #
+        passeer_semaphore "$LOG_LOCK"
+        #
+        if [ "x$details" = "x" ]
+        then
+            grep '^FAILED:' <"$TEMP_FILE.l" >>"$LOG_FILE"
+        else
+            cat "$TEMP_FILE.l" >>"$LOG_FILE"
+        fi
+        #
+        verlaat_semaphore "$LOG_LOCK"
+    fi
+done
+
+##
+## Print summary:
+##
+
+stdout
+stdout "  PROCESSING STATUS SUMMARY"
+stdout "    GenOpt   _________ Number of Links _________  Errors"
+stdout "     Dir       Old    Removed    New     Active"
+stdout "    -------- -------- -------- -------- -------- --------"
+
+ERRORS=0
+for sub in $SUBSET_OF_SUBDIRS
+do
+    if sub_in "$PROCESS_SUBDIRS"
+    then
+        TEMP_FILE="$TEMPORARY_FILES.$sub"
+        #
+        n_old="`cat \"$TEMP_FILE.o\" | wc -l`"
+        n_act="`cat \"$TEMP_FILE.a\" | wc -l`"
+        n_del="`grep '^REMOVE:' \"$TEMP_FILE.l\" | wc -l`"
+        n_new="`grep '^CREATE:' \"$TEMP_FILE.l\" | wc -l`"
+        n_err="`grep '^FAILED:' \"$TEMP_FILE.l\" | wc -l`"
+        #
+        ERRORS="`expr $ERRORS + $n_err`"
+        #
+        line="`echo \"$sub $n_old $n_del $n_new $n_act $n_err\" | \
+            awk '{ printf(\"    %-8s %8d %8d %8d %8d %8d\", $1, $2, $3, $4, $5, $6) }'`"
+        #
+        # (Do NOT split awk command lines - broken awk's abound!)
+        #
+        stdout "$line"
+    fi
+done
+
+stdout
+
+if [ "$ERRORS" -gt 0 ]
+then
+    if [ "$ERRORS" -eq 1 ]
+    then
+        ERRORS="$ERRORS error"
+    else
+        ERRORS="$ERRORS errors"
+    fi
+    stderr "$ERRORS --- see log file '$LOG_FILE'!"
+fi
+
+##
+## The End:
+##
+
+quit 0
+
+##
+## EOF
+##
+

@@ -1,0 +1,442 @@
+*** perl.bnp.orig	Mon Nov  9 07:30:03 1998
+--- perl.bnp	Mon Nov  9 07:30:05 1998
+***************
+*** 365,371 ****
+          $dirname = $distname;
+      }
+      $BnP->fetch("$distname.tar.gz", $relpath, $SourceDir);
+!     $BnP->system("gunzip -c '$SourceDir/$distname.tar.gz' | tar xf -");
+      $BnP->chdir($dirname);
+      if (ref($patchfunc) eq 'CODE')
+      {
+--- 365,371 ----
+          $dirname = $distname;
+      }
+      $BnP->fetch("$distname.tar.gz", $relpath, $SourceDir);
+!     $BnP->system("gunzip -c '$SourceDir/$distname.tar.gz' | tar xf - || true");
+      $BnP->chdir($dirname);
+      if (ref($patchfunc) eq 'CODE')
+      {
+***************
+*** 636,642 ****
+--- 636,648 ----
+  
+  $BnP->begin_section("fox");
+  &install_module('IO-1.20', 'authors/id/GBARR');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('IO-Tee-0.62', 'authors/id/KENSHAN');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  &install_module('IO-stringy-1.203', 'authors/id/ERYQ');
+  &install_module('IO-Stty-.02', 'authors/id/AUSCHUTZ');
+  # &install_module('Ptty-0.01', 'authors/id/NI-S', '', \&patch_Ptty);
+***************
+*** 661,667 ****
+  &install_module('Sys-OutPut-2.1', 'authors/id/AKSTE');
+  &install_module('Sys-Pushd-0.001', 'authors/id/JGLICK');
+  &install_module('Mmap-a2', 'authors/id/MICB', 'Mmap');
+! &install_module('Msgcat-1.00', 'authors/id/CHRWOLF', 'Msgcat');
+  &install_module('IPC-Signal-0.02', 'authors/id/ROSCH');
+  &install_module('IPC-Signal-Translate-0.01', '----');
+  &install_module('ipc_shareable-0.30', 'authors/id/BSUGARS');
+--- 667,673 ----
+  &install_module('Sys-OutPut-2.1', 'authors/id/AKSTE');
+  &install_module('Sys-Pushd-0.001', 'authors/id/JGLICK');
+  &install_module('Mmap-a2', 'authors/id/MICB', 'Mmap');
+! #&install_module('Msgcat-1.00', 'authors/id/CHRWOLF', 'Msgcat');
+  &install_module('IPC-Signal-0.02', 'authors/id/ROSCH');
+  &install_module('IPC-Signal-Translate-0.01', '----');
+  &install_module('ipc_shareable-0.30', 'authors/id/BSUGARS');
+***************
+*** 680,693 ****
+  &install_module('Tie-Watch-0.99', 'authors/id/LUSOL');
+  &install_module('Tie-Dir-1.02', 'authors/id/GBARR');
+  &install_module('Tie-Hash-Overlay-0.02', '----');
+  &install_module('Tie-Hash-Static-0.01', '----');
+  &install_module('Tie-Hash-Easy-0.01', '----');
+  &install_module('Tie-Scalar-Easy-0.01', '----');
+  &install_module('Tie-IxHash-1.21', 'authors/id/GSAR');
+  &install_module('Tie-TransactHash-0.03', 'authors/id/MIKEDLR');
+  &install_module('Tie-Handle-3.0', 'authors/id/STBEY');
+  &install_module('Tie-STDERR-0.122', 'authors/id/JANPAZ');
+! &install_module('Tie-LLHash-0.02', 'authors/id/KWILLIAMS');
+  
+  $BnP->end_section("tie");
+  
+--- 686,717 ----
+  &install_module('Tie-Watch-0.99', 'authors/id/LUSOL');
+  &install_module('Tie-Dir-1.02', 'authors/id/GBARR');
+  &install_module('Tie-Hash-Overlay-0.02', '----');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Tie-Hash-Static-0.01', '----');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  &install_module('Tie-Hash-Easy-0.01', '----');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Tie-Scalar-Easy-0.01', '----');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  &install_module('Tie-IxHash-1.21', 'authors/id/GSAR');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Tie-TransactHash-0.03', 'authors/id/MIKEDLR');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  &install_module('Tie-Handle-3.0', 'authors/id/STBEY');
+  &install_module('Tie-STDERR-0.122', 'authors/id/JANPAZ');
+! #&install_module('Tie-LLHash-0.02', 'authors/id/KWILLIAMS');
+  
+  $BnP->end_section("tie");
+  
+***************
+*** 754,760 ****
+  
+  &install_module('Errno-1.09', 'authors/id/GBARR');
+  &install_module('Error-0.12', 'authors/id/GBARR');
+! &install_module('BSD-Resource-1.0701', 'authors/id/JHI');
+  &install_module('Locale-Codes-1.00', 'authors/id/NEILB');
+  &install_module('Startup-0.103', 'authors/id/MSCHWARTZ');
+  
+--- 778,784 ----
+  
+  &install_module('Errno-1.09', 'authors/id/GBARR');
+  &install_module('Error-0.12', 'authors/id/GBARR');
+! #&install_module('BSD-Resource-1.0701', 'authors/id/JHI');
+  &install_module('Locale-Codes-1.00', 'authors/id/NEILB');
+  &install_module('Startup-0.103', 'authors/id/MSCHWARTZ');
+  
+***************
+*** 774,780 ****
+  &install_module('Set-IntRange-5.0', 'authors/id/STBEY');
+  &install_module('Set-IntSpan-1.06', 'authors/id/SWMCD');
+  &install_module('Set-Window-1.00', 'authors/id/SWMCD');
+! &install_module('Set-Scalar-0_003', 'authors/id/JHI');
+  &install_module('Math-VecStat-0.04', 'authors/id/JARW');
+  &install_module('Math-Approx-0.200', 'authors/id/ULPFR');
+  &install_module('Math-Trig-0.02', 'authors/id/JARW');
+--- 798,804 ----
+  &install_module('Set-IntRange-5.0', 'authors/id/STBEY');
+  &install_module('Set-IntSpan-1.06', 'authors/id/SWMCD');
+  &install_module('Set-Window-1.00', 'authors/id/SWMCD');
+! #&install_module('Set-Scalar-0_003', 'authors/id/JHI');
+  &install_module('Math-VecStat-0.04', 'authors/id/JARW');
+  &install_module('Math-Approx-0.200', 'authors/id/ULPFR');
+  &install_module('Math-Trig-0.02', 'authors/id/JARW');
+***************
+*** 783,789 ****
+  # (assembler complains about "operands given don't match any known
+  # 386 instruction" in lines 103 and 115 of file plotport.c using
+  # gcc 2.7.2.1 under FreeBSD 2.2.6)
+! &install_module('MathRandom-0.6', 'authors/id/JVENIER', 'MathRandom');
+  &install_module('Statistics-Descriptive-2.2', 'authors/id/COLINK');
+  &install_module('graph-modules-1.001', 'authors/id/NEILB');
+  &install_module('Bit-ShiftReg-2.0', 'authors/id/STBEY');
+--- 807,813 ----
+  # (assembler complains about "operands given don't match any known
+  # 386 instruction" in lines 103 and 115 of file plotport.c using
+  # gcc 2.7.2.1 under FreeBSD 2.2.6)
+! #&install_module('MathRandom-0.6', 'authors/id/JVENIER', 'MathRandom');
+  &install_module('Statistics-Descriptive-2.2', 'authors/id/COLINK');
+  &install_module('graph-modules-1.001', 'authors/id/NEILB');
+  &install_module('Bit-ShiftReg-2.0', 'authors/id/STBEY');
+***************
+*** 821,827 ****
+  
+  #   the ConfigReader package needs special handling:
+  $BnP->fetch('ConfigReader-0.5.tar.gz', 'authors/id/AMW', $SourceDir);
+! $BnP->system("gunzip -c '$SourceDir/ConfigReader-0.5.tar.gz' | tar xf -");
+  $BnP->chdir("ConfigReader-0.5");
+  $BnP->mkdir("lib/ConfigReader");
+  $BnP->system("mv *.pm lib/ConfigReader/");
+--- 845,857 ----
+  
+  #   the ConfigReader package needs special handling:
+  $BnP->fetch('ConfigReader-0.5.tar.gz', 'authors/id/AMW', $SourceDir);
+! 
+! # Warning: The following module produces a "tar: read error: unexpected EOF"
+! # error message on my machine with SunOS 4.1.3:
+! $BnP->system("gunzip -c '$SourceDir/ConfigReader-0.5.tar.gz' | tar xf - || true");
+! # If this happens, append the following line to the "recover.bnp" file:
+! # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
+! 
+  $BnP->chdir("ConfigReader-0.5");
+  $BnP->mkdir("lib/ConfigReader");
+  $BnP->system("mv *.pm lib/ConfigReader/");
+***************
+*** 880,886 ****
+  
+  $BnP->begin_section("swig");
+  $BnP->fetch('swig1.1p5.tar.gz', 'authors/id/DBEAZLEY', $SourceDir);
+! $BnP->system("gunzip -c '$SourceDir/swig1.1p5.tar.gz' | tar xf -");
+  $BnP->chdir("SWIG1.1p5");
+  $BnP->system("/bin/sh ./configure --prefix=\"$Prefix\"",
+      "--with-lang=PERL5", "--with-perl5=\"$Perl\"");
+--- 910,922 ----
+  
+  $BnP->begin_section("swig");
+  $BnP->fetch('swig1.1p5.tar.gz', 'authors/id/DBEAZLEY', $SourceDir);
+! 
+! # Warning: The following module produces a "tar: read error: unexpected EOF"
+! # error message on my machine with SunOS 4.1.3:
+! $BnP->system("gunzip -c '$SourceDir/swig1.1p5.tar.gz' | tar xf - || true");
+! # If this happens, append the following line to the "recover.bnp" file:
+! # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
+! 
+  $BnP->chdir("SWIG1.1p5");
+  $BnP->system("/bin/sh ./configure --prefix=\"$Prefix\"",
+      "--with-lang=PERL5", "--with-perl5=\"$Perl\"");
+***************
+*** 907,913 ****
+  $BnP->end_section("fox");
+  &install_module('Time-modules-98.081201', 'authors/id/MUIR/modules');
+  &install_module('Time-HiRes-01.18', 'authors/id/DEWEG');
+! &install_module('BSD-Time-0.04', '----');
+  &install_module('Period-1.20', 'authors/id/PRYAN');
+  &install_module('Interval.0.02', 'authors/id/KTORP', 'Date');
+  
+--- 943,949 ----
+  $BnP->end_section("fox");
+  &install_module('Time-modules-98.081201', 'authors/id/MUIR/modules');
+  &install_module('Time-HiRes-01.18', 'authors/id/DEWEG');
+! #&install_module('BSD-Time-0.04', '----');
+  &install_module('Period-1.20', 'authors/id/PRYAN');
+  &install_module('Interval.0.02', 'authors/id/KTORP', 'Date');
+  
+***************
+*** 971,977 ****
+  $BnP->begin_section("fox");
+  
+  $BnP->begin_section("net");
+! &install_module('pRPC-modules-0.1002', 'authors/id/JWIED');
+  # &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+  # (requires 'machine/ansi.ph' in syslog.ph line 74 which doesn't exist --
+  # seems to be a bug in h2ph)
+--- 1007,1013 ----
+  $BnP->begin_section("fox");
+  
+  $BnP->begin_section("net");
+! &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+  # &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+  # (requires 'machine/ansi.ph' in syslog.ph line 74 which doesn't exist --
+  # seems to be a bug in h2ph)
+***************
+*** 997,1003 ****
+  $BnP->system("/bin/sh ../dist/configure");
+  $BnP->system("make");
+  $BnP->back(2);
+- $BnP->resume();
+  
+  $BnP->fetch('DB_File-1.60.tar.gz', 'authors/id/PMQS', $SourceDir);
+  $BnP->system("gunzip -c '$SourceDir/DB_File-1.60.tar.gz' | tar xf -");
+--- 1033,1038 ----
+***************
+*** 1009,1014 ****
+--- 1044,1050 ----
+  $BnP->system("make install UNINST=1");
+  &install_tree_manpages("DB_File-1.60");
+  $BnP->back();
++ $BnP->resume();
+  
+  $BnP->end_section("db");
+  
+***************
+*** 1018,1025 ****
+  
+  &install_module('MD5-1.7', 'authors/id/NWINT');
+  &install_module('SHA-1.2', 'authors/id/UWEH');
+! &install_module('Crypt-DES-1.0', 'authors/id/GARY');
+! &install_module('Crypt-IDEA-1.0', 'authors/id/GARY');
+  &install_module('PGP-0.3a', 'authors/id/GEHIC');
+  &install_module('PGP-Sign-0.09', 'authors/id/RRA');
+  $BnP->begin_section("fox");
+--- 1054,1061 ----
+  
+  &install_module('MD5-1.7', 'authors/id/NWINT');
+  &install_module('SHA-1.2', 'authors/id/UWEH');
+! #&install_module('Crypt-DES-1.0', 'authors/id/GARY');
+! #&install_module('Crypt-IDEA-1.0', 'authors/id/GARY');
+  &install_module('PGP-0.3a', 'authors/id/GEHIC');
+  &install_module('PGP-Sign-0.09', 'authors/id/RRA');
+  $BnP->begin_section("fox");
+***************
+*** 1029,1035 ****
+--- 1065,1077 ----
+  &install_module('MIME-Base64-2.06', 'authors/id/GAAS');
+  &install_module('MIME-tools-4.121', 'authors/id/ERYQ');
+  &install_module('MIME-Lite-1.123', 'authors/id/ERYQ');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Convert-UU-0.20', 'authors/id/ANDK');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  $BnP->system("chmod 555 '$Prefix/bin/puuencode'");
+  $BnP->system("chmod 555 '$Prefix/bin/puudecode'");
+  $BnP->end_section("fox");
+***************
+*** 1104,1110 ****
+--- 1146,1158 ----
+  &install_module('Text-CSV-0.01', 'authors/id/ALANCITT');
+  &install_module('Text-Metaphone-0.02', 'authors/id/MSCHWERN');
+  # &install_module('Text-Soundex-2.00', 'authors/id/MIKESTOK');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Text-Soundex-2.13', 'authors/id/MARKM');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  # &install_module('Text-Format0.52+NWrap0.11', 'authors/id/GABOR');
+  &install_module('Text-Format0.52', 'authors/id/GABOR');
+  &install_module('Text-MetaText-0.22', 'authors/id/ABW');
+***************
+*** 1117,1123 ****
+  &install_module('ParseLex-2.02', 'authors/id/PVERD');
+  &install_module('PLex-0.01', '----');
+  &install_module('Data-ShowTable-3.3', 'authors/id/AKSTE');
+! &install_module('String-Approx-2.7', 'authors/id/JHI');
+  &install_module('String-ShellQuote-1.00', 'authors/id/ROSCH');
+  &install_module('String-CRC-1.0', 'authors/id/MUIR/modules');
+  &install_module('Array-Lookup-2.1', 'authors/id/AKSTE');
+--- 1165,1171 ----
+  &install_module('ParseLex-2.02', 'authors/id/PVERD');
+  &install_module('PLex-0.01', '----');
+  &install_module('Data-ShowTable-3.3', 'authors/id/AKSTE');
+! #&install_module('String-Approx-2.7', 'authors/id/JHI');
+  &install_module('String-ShellQuote-1.00', 'authors/id/ROSCH');
+  &install_module('String-CRC-1.0', 'authors/id/MUIR/modules');
+  &install_module('Array-Lookup-2.1', 'authors/id/AKSTE');
+***************
+*** 1149,1157 ****
+  &install_module('libnet-1.0605', 'authors/id/GBARR');
+  &install_module('Net-Telnet-3.01', 'authors/id/JROGERS');
+  &install_module('Net-DNS-0.12', 'authors/id/MFUHR');
+! &install_module('Net-ext-0.84', 'authors/id/SPIDB');
+  # &install_module('Net-ext-0.84.sig', 'authors/id/SPIDB');
+  &install_module('Net-Ident-1.11', 'authors/id/JPC');
+  &install_module('Net-Whois-0.22', 'authors/id/CHIPS');
+  $BnP->end_section("fox");
+  
+--- 1197,1211 ----
+  &install_module('libnet-1.0605', 'authors/id/GBARR');
+  &install_module('Net-Telnet-3.01', 'authors/id/JROGERS');
+  &install_module('Net-DNS-0.12', 'authors/id/MFUHR');
+! #&install_module('Net-ext-0.84', 'authors/id/SPIDB');
+  # &install_module('Net-ext-0.84.sig', 'authors/id/SPIDB');
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Net-Ident-1.11', 'authors/id/JPC');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  &install_module('Net-Whois-0.22', 'authors/id/CHIPS');
+  $BnP->end_section("fox");
+  
+***************
+*** 1162,1173 ****
+  &install_module('NetObj-1', '----');
+  
+  $BnP->begin_section("penguin");
+  &install_module('Penguin-3.00', 'authors/id/FSG');
+  &install_module('Penguin-Easy-1.1', 'authors/id/JDUNCAN');
+  $BnP->end_section("penguin");
+  
+  &install_module('RPC-Simple-0.5', 'authors/id/DDUMONT');
+! &install_module('Net-Pcap-0.01', 'authors/id/PLISTER'); # for FreeBSD2
+  
+  $BnP->end_section("net");
+  
+--- 1216,1233 ----
+  &install_module('NetObj-1', '----');
+  
+  $BnP->begin_section("penguin");
++ 
++ # Warning: The following module produces a "tar: read error: unexpected EOF"
++ # error message on my machine with SunOS 4.1.3:
+  &install_module('Penguin-3.00', 'authors/id/FSG');
++ # If this happens, append the following line to the "recover.bnp" file:
++ # system gunzip -c '<PREFIX> /lib/BnP/perl/src/<MODULE> .tar.gz' | tar xf -
++ 
+  &install_module('Penguin-Easy-1.1', 'authors/id/JDUNCAN');
+  $BnP->end_section("penguin");
+  
+  &install_module('RPC-Simple-0.5', 'authors/id/DDUMONT');
+! #&install_module('Net-Pcap-0.01', 'authors/id/PLISTER'); # for FreeBSD2
+  
+  $BnP->end_section("net");
+  
+***************
+*** 1359,1370 ****
+  $BnP->fetch('Curses-1.02.tar.gz', 'authors/id/WPS', $SourceDir);
+  $BnP->system("gunzip -c '$SourceDir/Curses-1.02.tar.gz' | tar xf -");
+  $BnP->chdir("Curses-1.02");
+! $BnP->system("rm -f c-config.h; ln hints/c-freebsd.ncurses.h c-config.h");
+  #                                          ^^^^^^^
+  #                                          !!!!!!!
+! $BnP->patch("Makefile.PL",
+!     's!my \$inc;!my \$inc = \"\";!',
+!     's!my \$libs;!my \$libs = \"-lncurses -ltermcap\";!');
+  $BnP->system("'$Perl' Makefile.PL");
+  $BnP->system("make");
+  $BnP->system("make install UNINST=1");
+--- 1419,1431 ----
+  $BnP->fetch('Curses-1.02.tar.gz', 'authors/id/WPS', $SourceDir);
+  $BnP->system("gunzip -c '$SourceDir/Curses-1.02.tar.gz' | tar xf -");
+  $BnP->chdir("Curses-1.02");
+! #$BnP->system("rm -f c-config.h; ln hints/c-sunos.ncurses.h c-config.h");
+  #                                          ^^^^^^^
+  #                                          !!!!!!!
+! #$BnP->patch("Makefile.PL",
+! #    's!my \$inc;!my \$inc = \"\";!',
+! #    's!my \$libs;!my \$libs = \"-lncurses\";!');
+! ##   's!my \$libs;!my \$libs = \"-lncurses -ltermcap\";!');
+  $BnP->system("'$Perl' Makefile.PL");
+  $BnP->system("make");
+  $BnP->system("make install UNINST=1");
+***************
+*** 1415,1421 ****
+  &install_module('X11-Protocol-0.04', 'authors/id/SMCCAM');
+  $BnP->end_section("x11");
+  
+! $BnP->begin_section("tk","ptk","fox"); # Perl Tk
+  &install_module('Tk800.011', 'authors/id/NI-S');
+  &install_module('Tk-FileDialog-1.3', 'authors/id/BPOWERS');
+  &install_module('Tk-GBARR-1.03', 'authors/id/GBARR');
+--- 1476,1482 ----
+  &install_module('X11-Protocol-0.04', 'authors/id/SMCCAM');
+  $BnP->end_section("x11");
+  
+! $BnP->begin_lazy_section("tk","ptk","fox"); # Perl Tk
+  &install_module('Tk800.011', 'authors/id/NI-S');
+  &install_module('Tk-FileDialog-1.3', 'authors/id/BPOWERS');
+  &install_module('Tk-GBARR-1.03', 'authors/id/GBARR');
+***************
+*** 1426,1432 ****
+  &install_module('Tk-WaitBox-1.2', 'authors/id/BPOWERS');
+  &install_module('Tk-Multi-0.71', 'authors/id/DDUMONT');
+  &install_module('Tk-HTML-3.002', 'authors/id/NI-S');
+! $BnP->end_section("tk","ptk","fox");
+  
+  $BnP->end_section("gui");
+  
+--- 1487,1493 ----
+  &install_module('Tk-WaitBox-1.2', 'authors/id/BPOWERS');
+  &install_module('Tk-Multi-0.71', 'authors/id/DDUMONT');
+  &install_module('Tk-HTML-3.002', 'authors/id/NI-S');
+! $BnP->end_lazy_section("tk","ptk","fox");
+  
+  $BnP->end_section("gui");
+  

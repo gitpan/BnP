@@ -1,0 +1,1496 @@
+#!perl
+
+require 5.000;
+
+###############################################################################
+##                                                                           ##
+##    This is the "perl.bnp" Perl script of "Build'n'Play" (BnP).            ##
+##                                                                           ##
+##    (The script which knows how to install Perl and most of the            ##
+##    modules from CPAN, the "Comprehensive Perl Archive Network".)          ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This script is a complete rewrite of a script initially written        ##
+##    by Ralf S. Engelschall.                                                ##
+##                                                                           ##
+##    Copyright (c) 1996 - 1998 by Ralf S. Engelschall.                      ##
+##    All rights reserved.                                                   ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "perl.bnp" was developed with support from O'Reilly    ##
+##    Verlag and was first published on the CD-ROM accompanying the book     ##
+##    "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).               ##
+##                                                                           ##
+##    Diese Version von "perl.bnp" entstand mit Unterstuetzung des O'Reilly  ##
+##    Verlag und wurde erstmalig auf der CD-ROM zum Buch "Programmieren      ##
+##    mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.              ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##  Executes: ~3200    shell commands                                        ##
+##  Needs:     ~125 MB temporary space                                       ##
+##              ~50 MB disk space for Perl and its modules                   ##
+##               ~3 h  on a Pentium 133 with FreeBSD 2.2.6                   ##
+##  (all values with the generation of HTML man-pages enabled)               ##
+##                                                                           ##
+###############################################################################
+
+package BnP::perl;
+
+BEGIN { unshift(@INC, pop(@ARGV)); }
+
+use BnP;
+
+##
+## Note that we cannot use any other "use" here at all, because in most
+## cases, this will require the "Exporter" module, which miniperl (used
+## for bootstrapping) does not provide (nor any other module)!
+##
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# Specify here the version of the Perl 5 distribution to be installed
+# (but WITHOUT the ".tar.gz" suffix!):
+# (Initial setting is $PerlVersion = 'perl5.005_02';)
+#
+$PerlVersion = 'perl5.005_02';
+
+# Set the following option to any value Perl considers to be "true"
+# in order to enable the brand-new feature in Perl 5.005, *THREADS*.
+# Note that in the current release of Perl, this feature is still
+# experimental, which is the reason why it is disabled by default.
+# (Initial setting is $Threads = '';)
+#
+$Threads = '';
+
+# Do you want HTML versions of all man-pages? Set the following
+# option to a (Perl) true value to enable or to false to disable.
+# Note that disabling this option speeds up execution considerably
+# and uses much less disk space (about 10 MB)!
+# (Initial setting is $HTML = 1;)
+#
+$HTML = 1;
+
+# What are the URLs of your favourite (= fastest) CPAN
+# mirror sites? (E.g. @URL = ( 'http://www.perl.com/CPAN',
+# 'ftp://ftp.funet.fi/pub/languages/perl/CPAN' ); etc.)
+# (The URLs should end with "CPAN" and should not
+# have a trailing slash "/". The URLs will be tried
+# in the given order, from top to bottom.)
+#
+@URL =
+(
+    'ftp://ftp.funet.fi/pub/languages/perl/CPAN',
+    'http://www.perl.com/CPAN',
+    # (The latter supplies automatic redirection
+    # to a web site "near" you.)
+    'ftp://ftp.engelschall.com/pub/bnp/packages'
+);
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+$VERSION = "2.1.0 (09-Nov-1998)";  ##  no 'my' for MakeMaker!
+
+##
+## Fetch our remaining private parameters:
+##
+
+my $Path = pop(@ARGV);
+my $Stub = pop(@ARGV);
+my $Site = pop(@ARGV);
+my $Perl = pop(@ARGV);
+
+##
+## Initialization of internal constants:
+##
+
+if (exists $ENV{'BNP_HTML'}) { $HTML = $ENV{'BNP_HTML'}; }
+
+if (exists $ENV{'BNP_THREADS'}) { $Threads = $ENV{'BNP_THREADS'}; }
+
+if (exists $ENV{'BNP_PERLVERSION'}) { $PerlVersion = $ENV{'BNP_PERLVERSION'}; }
+
+if ($Threads && $PerlVersion eq 'perl5.005_02') { $Threads = "-Dusethreads"; }
+else                                            { $Threads = ""; }
+
+my $References = join(':',
+qw(
+    perl perlapio perlbook perlbot perlbug perlcall perldata perldebug
+    perldelta perldiag perldsc perlembed perlfaq perlfaq1 perlfaq2
+    perlfaq3 perlfaq4 perlfaq5 perlfaq6 perlfaq7 perlfaq8 perlfaq9
+    perlform perlfunc perlguts perlhist perlipc perllocale perllol
+    perlmod perlmodinstall perlmodlib perlobj perlop perlplan9 perlpod
+    perlport perlre perlref perlrun perlsec perlstyle perlsub perlsyn
+    perltie perltoc perltoot perltrap perlvar perlvms perlwin32 perlxs
+    perlxstut POSIX Exporter DB_File
+));
+
+##
+## Declaration of global variables:
+##
+
+my $SourceDir;
+my $Workspace;
+my $HTMLROOT;
+my $MANIFEST;
+my $POD_Root;
+my $POD_Libs;
+my $Prefix;
+my $BnP;
+
+##
+## Check some basic requirements:
+##
+
+&indispensable
+(
+    'ar',
+    'cp',
+    'mv',
+    'sh',
+    'tar',
+    'find',
+    'make',
+    'true',
+    'false',
+    'chmod',
+#   'strip',
+    'gunzip'
+);
+
+##
+## Check for some optional tools:
+##
+
+$nroff = find('nroff', $ENV{'PATH'});
+$rman  = find('rman',  $ENV{'PATH'});
+
+##
+## Subroutines:
+##
+
+sub patch_skip
+    { $BnP->patch("Makefile.PL", 's!.+SKIP.+!!'); }
+
+sub patch_Ptty
+    { $BnP->patch("AutoConf",    's!^use Tk::Pretty!!'); }
+
+sub install_perl_manpages
+{
+    return unless ($HTML && $BnP->active());
+    $BnP->system("'$Perl' '$Workspace/$PerlVersion/installhtml'",
+        "--podpath=lib:ext:pod:vms:plan9:x2p",
+        "--podroot='$Workspace/$PerlVersion'",
+        "--htmldir='$HTMLROOT'",
+        "--htmlroot='$HTMLROOT'",
+        "--splithead=pod/perlipc",
+        "--splititem=pod/perlfunc",
+        "--libpods=$References",
+#       "--verbose",
+        "--recurse");
+}
+
+sub initialize_pod2html
+{
+    my($root);
+
+    return unless ($HTML);
+    $POD_Root = "";
+    $POD_Libs = "--libpods=$References";
+    $root = $PerlVersion;
+    $root =~ s!^perl!!;
+    $root =~ s!_!!g;
+    $root = "$Prefix/lib/$root/pod";
+    if (-d $root)
+    {
+        $POD_Root = "--podroot='$root'";
+    }
+    else
+    {
+        $root = "$Prefix/lib/pod";
+        if (-d $root)
+        {
+            $POD_Root = "--podroot='$root'";
+        }
+        else
+        {
+            chomp($root = `find "$Prefix/lib" -type d -name "pod" -print`);
+            if (($root =~ m!^/[^\n]+$!) && (-d $root))
+            {
+                $POD_Root = "--podroot='$root'";
+            }
+            else
+            {
+                $POD_Libs = "";
+            }
+        }
+    }
+}
+
+sub install_manpage
+{
+    my($distname,$orig,$dest,$sect) = @_;
+
+    return unless ($HTML && $BnP->active());
+    $BnP->system("'$Perl' '$Prefix/bin/pod2html'",
+        "$POD_Root",
+        "$POD_Libs",
+        "--htmlroot='$HTMLROOT'",
+#       "--verbose",
+        "'$orig' >'$HTMLROOT/$sect/$dest'");
+    $BnP->system("echo '$distname $orig $sect/$dest' >>'$MANIFEST'");
+}
+
+sub install_package_manpages
+{
+    my($distname) = @_;
+    my($first,$continue,$command,$item,$orig,$dest);
+
+    return unless ($HTML && $BnP->active());
+    #
+    # Find manual pages by scanning the "manifypods"
+    # target of the Makefile. If it's a standard
+    # MakeMaker Makefile this target exists.
+    #
+    unless (open(PIPE, "make POD2MAN=Build_n_Play -n manifypods 2>&1 |"))
+    {
+        fatal "Can't read pipe from 'make -n manifypods': $!";
+    }
+    $first = 1;
+    $continue = 0;
+    while ($command = <PIPE>)
+    {
+        $command =~ s!\n+$!!;
+        $command =~ s!\s+! !g;
+        next unless ($continue || ($command =~ s!^\s*Build_n_Play\b!!));
+        $continue = ($command =~ s!\\$!!);
+        #
+        # Now iterate over the list of "$orig" and "$dest" files
+        # and run our own pod2html command:
+        #
+        foreach $item (split(' ', $command))
+        {
+            if ($first)
+            {
+                $first = 0;
+                $orig = $item;
+            }
+            else
+            {
+                $first = 1;
+                if ($item =~ m!\bblib/man(\d)/([^/]+)\.\1$!)
+                {
+                    $dest = "$2.html";
+                }
+                elsif ($item =~ m!\bblib/.+/([^/]+?)(?:\.\d)?$!)
+                {
+                    $dest = "$1.html";
+                }
+                else
+                {
+                    $dest = $item;
+                    $dest =~ s!^.*/!!;
+                    $dest .= ".html";
+                }
+                &install_manpage($distname,$orig,$dest,"mod");
+            }
+        }
+    }
+    close(PIPE);
+}
+
+sub install_tree_manpages
+{
+    my($distname) = @_;
+    my($item,$dir,$subdir);
+    my(@list);
+
+    return unless ($HTML && $BnP->active());
+    #
+    # Subroutine for installing HTML manpages of all subdirectories
+    # containing a Makefile.PL, provided that the Makefile conforms
+    # to the MakeMaker standard:
+    #
+    @list = `find . -type f -name "Makefile.PL" -print`;
+    foreach $item (@list)
+    {
+        chomp($item);
+        $item =~ s!/+!/!g;
+        $item =~ s!^\./!!;
+        if ($item =~ m![^/]/[^/]!) # subdirectory
+        {
+            $dir = $item;
+            $dir =~ s!/[^/]+$!!; # strip the "/Makefile.PL"
+            $BnP->chdir($dir);
+            &install_package_manpages($distname);
+            $dir =~ s![^/]+!!g;
+            $BnP->back(length($dir)+1);
+        }
+        else # package's main directory
+        {
+            &install_package_manpages($distname);
+        }
+    }
+}
+
+sub install_module
+{
+    my($distname,$relpath,$dirname,$patchfunc) = @_;
+
+    return unless ($BnP->active());
+    unless (defined $dirname && $dirname ne '')
+    {
+        $dirname = $distname;
+    }
+    $BnP->fetch("$distname.tar.gz", $relpath, $SourceDir);
+    $BnP->system("gunzip -c '$SourceDir/$distname.tar.gz' | tar xf -");
+    $BnP->chdir($dirname);
+    if (ref($patchfunc) eq 'CODE')
+    {
+        &{$patchfunc}();
+    }
+    $BnP->system("'$Perl' Makefile.PL <$NULL");
+    $BnP->system("make");
+    $BnP->system("make install UNINST=1");
+    &install_tree_manpages($distname);
+    $BnP->back();
+}
+
+##
+## Main:
+##
+
+# =========================================================================== #
+
+$BnP = BnP->new( @ARGV );
+
+$Prefix = $BnP->prefix();
+
+$SourceDir = $BnP->homedir() . "/src";
+
+$Workspace = $BnP->workspace();
+
+$Perl = "$Prefix/bin/perl";
+
+$HTMLROOT = "$Prefix/html";
+
+$MANIFEST = "$HTMLROOT/MANIFEST";
+
+# =========================================================================== #
+
+$BnP->begin();
+
+$BnP->path( $Path );
+
+$BnP->stub( $Stub );
+
+$BnP->url( $Site, @URL );
+
+# =========================================================================== #
+
+$BnP->begin_must_section();
+
+$BnP->mkdir("$Prefix/man/man1");
+$BnP->mkdir("$Prefix/man/man3");
+
+if ($HTML)
+{
+    $BnP->mkdir("$HTMLROOT/mod");
+    $BnP->system("touch '$MANIFEST'");
+}
+
+$BnP->end_must_section();
+
+# =========================================================================== #
+
+$BnP->begin_section("core");
+
+# =========================================================================== #
+
+$BnP->fetch("$PerlVersion.tar.gz", 'src/5.0', $SourceDir);
+
+$BnP->system("gunzip -c '$SourceDir/$PerlVersion.tar.gz' | tar xf -");
+
+$BnP->chdir("$PerlVersion");
+
+$BnP->patch("Configure", 's,\bif\s+test\s+!\s+-t\s+0\b,if false,');
+
+$BnP->system("/bin/sh ./Configure -des",
+             "-Dprefix=\"$Prefix\"",
+             "$ENV{'BNP_FLAGS'}",
+             "$Threads");
+
+$BnP->system("make");
+
+#   make sure that the basic system is ok:
+#$BnP->system("make test");
+
+#   install the basic system, but deny symlinking of /usr/bin/perl:
+$BnP->system("echo 'n' | make install");
+
+#   only now we can refer to the pod subdirectory to initialize "--podroot":
+&initialize_pod2html();
+
+#   additionally install the various POD and PM files as HTML manpages:
+&install_perl_manpages();
+&install_manpage($PerlVersion, "x2p/s2p", "s2p.html", "x2p");
+&install_manpage($PerlVersion, "utils/h2xs", "h2xs.html", "x2p");
+&install_manpage($PerlVersion, "lib/ExtUtils/xsubpp", "xsubpp.html", "x2p");
+
+#   from inside the perl distribution, back to workspace:
+$BnP->back(); # (BTW, we could use "reset()" here just as well.)
+
+#   handle system includes:
+$BnP->system("cd /usr/include; $Prefix/bin/h2ph *.h sys/*.h");
+
+#$BnP->system("strip '$Prefix'/bin/* || true"); # avoid errors on scripts
+
+# =========================================================================== #
+
+$BnP->end_section("core");
+
+# =========================================================================== #
+
+$BnP->begin_section("modules");
+
+# =========================================================================== #
+
+$BnP->begin_section("compiler"); # Perl Compiler
+
+$BnP->ignore(); # module seems to be broken; compiler errors under FreeBSD2
+
+$BnP->fetch('Compiler-a3.tar.gz', 'authors/id/MICB', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Compiler-a3.tar.gz' | tar xf -");
+$BnP->chdir("Compiler-a3");
+#   fix the version string:
+$BnP->patch("Makefile.PL", 's!\"a2\"!\"a3\"!');
+$BnP->system("'$Perl' Makefile.PL");
+#   add -DINDIRECT_BGET_MACROS to CCCMD in Makefile:
+$BnP->patch("Makefile", 's!^(CCCMD = .*)\\\\!$1 -DINDIRECT_BGET_MACROS \\\\!');
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+#   additionally install the byteperl interpreter:
+$BnP->system("strip byteperl; cp byteperl '$Prefix/bin/byteperl';",
+    "chmod 555 '$Prefix/bin/byteperl'");
+#   additionally install the perl CC wrapper and
+#   the missing C header file which is needed at compile time:
+$BnP->system("(echo '#!$Perl'; cat cc_harness) >'$Prefix/bin/pcc';",
+    "chmod 555 '$Prefix/bin/pcc'");
+$BnP->system("cp cc_runtime.h `'$Perl' -e 'use Config;",
+    "print \"\$Config{installarchlib}/CORE\";'`");
+&install_tree_manpages("Compiler-a3");
+$BnP->back();
+
+$BnP->resume();
+
+&install_module('B-Graph-0.50', 'authors/id/SMCCAM');
+
+$BnP->end_section("compiler");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("byacc"); # Berkeley YACC for Perl 5
+
+if ((find('patch',   $ENV{'PATH'}) eq '') ||
+    (find('install', $ENV{'PATH'}) eq ''))
+{
+    alert "Can't find 'patch' and 'install', skipping 'byacc'!";
+    $BnP->ignore();
+}
+
+$BnP->fetch('perl5-byacc-patches-0.6.tar.gz', 'authors/id/JAKE', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/perl5-byacc-patches-0.6.tar.gz' |",
+    "tar xf -");
+
+$BnP->chdir("perl5-byacc-patches-0.6");
+
+$BnP->fetch('perl-byacc1.8.2.tar.gz', 'src/misc', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/perl-byacc1.8.2.tar.gz' | tar xf -");
+
+$BnP->chdir("perl-byacc1.8.2");
+
+$BnP->system("patch <../patch");
+$BnP->system("make");
+$BnP->system("cp byacc '$Prefix/bin/pbyacc';",
+    "chmod 555 '$Prefix/bin/pbyacc'");
+$BnP->system("cp byacc.man '$Prefix/man/man1/pbyacc.1';",
+    "chmod 444 '$Prefix/man/man1/pbyacc.1'");
+
+if ($HTML)
+{
+    if ($nroff ne '' && $rman ne '')
+    {
+        $BnP->system("'$nroff' -man byacc.man |",
+            "'$rman' -f HTML >'$HTMLROOT/mod/pbyacc.html'");
+
+        $BnP->system("echo 'perl5-byacc-0.5 byacc.man mod/pbyacc.html'",
+            ">>'$MANIFEST'");
+    }
+    $BnP->system("(echo '<html><pre>'; cat ../README;",
+        "echo '</pre></html>') >'$HTMLROOT/mod/pbyacc-readme.html'");
+
+    $BnP->system("echo 'perl5-byacc-patches-0.6 README mod/pbyacc-readme.html'",
+        ">>'$MANIFEST'");
+}
+
+$BnP->back(2);
+
+$BnP->resume();
+
+$BnP->end_section("byacc");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("bison"); # GNU Bison for Perl 5
+
+if (find('install', $ENV{'PATH'}) eq '')
+{
+    alert "Can't find 'install', skipping 'bison'!";
+    $BnP->ignore();
+}
+
+$BnP->fetch('perl-bison-1.25.1.00.tar.gz', 'authors/id/SFINK', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/perl-bison-1.25.1.00.tar.gz' | tar xf -");
+$BnP->chdir("perl-bison-1.25");
+$BnP->system("/bin/sh ./configure --prefix=\"$Prefix\"");
+$BnP->system("make");
+$BnP->system("make install");
+$BnP->back();
+
+$BnP->resume();
+
+$BnP->end_section("bison");
+
+# --------------------------------------------------------------------------- #
+
+#   Note that the following modules should be installed first,
+#   because all other modules hereafter depend on them!
+
+$BnP->begin_section("make","install","extutils");
+
+# Package Make & Extension Tools:
+
+&install_module('MakeMaker-5.41', 'authors/id/ANDK');
+&install_module('ExtUtils-Embed-1.14', 'authors/id/DOUGM');
+&install_module('ExtUtils-DynaGlue-1.00a', 'authors/id/DOUGM');
+# &install_module('C-DynaLib-0.54', 'authors/id/JTOBEY');
+# (compiler complains about undeclared symbol 'in_eval' in DynaLib.xs line 253)
+&install_module('ExtUtils-Manifest-1.33', '----');
+&install_module('ExtUtils-TBone-1.109', 'authors/id/ERYQ');
+&install_module('Test-Harness-1.15', '----');
+&install_module('Test-Helper-0.002', 'authors/id/JGLICK');
+&install_module('Test-1.08', 'authors/id/JPRIT');
+&install_module('Make-0.02', 'authors/id/NI-S');
+&install_module('ModsPragma-0.004', 'authors/id/JGLICK');
+&install_module('AutoSplit-1.03', 'authors/id/ANDK');
+&install_module('builtin-0.04', 'authors/id/GBARR');
+&install_module('rlib-0.02', 'authors/id/GBARR');
+
+$BnP->end_section("make","install","extutils");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("pod"); # POD Format Files
+
+&install_module('PodParser-1.05', 'authors/id/BRADAPP');
+
+#   the pod2ps tool needs special handling:
+$BnP->fetch('pod2ps-1.0.1.tar.gz', 'authors/id/JPRAVETZ', $SourceDir);
+$BnP->mkdir('pod2ps-1.0.1');
+$BnP->chdir('pod2ps-1.0.1');
+$BnP->system("gunzip -c '$SourceDir/pod2ps-1.0.1.tar.gz' | tar xf -");
+$BnP->system("(echo '#!$Perl'; cat pod2ps-1.0.1) >'$Prefix/bin/pod2ps';",
+    "chmod 555 '$Prefix/bin/pod2ps'");
+&install_manpage("pod2ps-1.0.1", "pod2ps-1.0.1", "pod2ps.html", "mod");
+$BnP->back();
+
+&install_module('PodFilter-0.01', '----');
+
+$BnP->end_section("pod");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("io"); # I/O & System
+
+$BnP->begin_section("fox");
+&install_module('IO-1.20', 'authors/id/GBARR');
+&install_module('IO-Tee-0.62', 'authors/id/KENSHAN');
+&install_module('IO-stringy-1.203', 'authors/id/ERYQ');
+&install_module('IO-Stty-.02', 'authors/id/AUSCHUTZ');
+# &install_module('Ptty-0.01', 'authors/id/NI-S', '', \&patch_Ptty);
+# (missing header file sys/stropts.h on FreeBSD 2.2.6)
+
+$BnP->fetch("IO-Tty-0.02.tar.gz", 'authors/id/GBARR', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/IO-Tty-0.02.tar.gz' | tar xf -");
+$BnP->chdir("IO-Tty-0.02");
+$BnP->patch("Makefile.PL",
+    "s!system\\('\\./Configure'\\)!system('/bin/sh ./Configure -des')!");
+$BnP->patch("Configure", 's,\bif\s+test\s+!\s+-t\s+0\b,if false,');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages('IO-Tty-0.02');
+$BnP->back();
+$BnP->end_section("fox");
+
+&install_module('Ioctl-0_7', 'authors/id/KJALB');
+&install_module('Stream-1.00', 'authors/id/GARY');
+&install_module('Df-0.0.1', 'authors/id/FTASSIN');
+&install_module('Sys-OutPut-2.1', 'authors/id/AKSTE');
+&install_module('Sys-Pushd-0.001', 'authors/id/JGLICK');
+&install_module('Mmap-a2', 'authors/id/MICB', 'Mmap');
+&install_module('Msgcat-1.00', 'authors/id/CHRWOLF', 'Msgcat');
+&install_module('IPC-Signal-0.02', 'authors/id/ROSCH');
+&install_module('IPC-Signal-Translate-0.01', '----');
+&install_module('ipc_shareable-0.30', 'authors/id/BSUGARS');
+&install_module('Proc-Forkfunc-96.042201', 'authors/id/MUIR/modules');
+&install_module('Proc-WaitStat-0.01', 'authors/id/ROSCH');
+&install_module('Include-1.02a', 'authors/id/GBARR', '', \&patch_skip);
+
+&install_module('Glob-BSD-0.92', '----');
+
+$BnP->end_section("io");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("tie"); # Tie Stuff
+
+&install_module('Tie-Watch-0.99', 'authors/id/LUSOL');
+&install_module('Tie-Dir-1.02', 'authors/id/GBARR');
+&install_module('Tie-Hash-Overlay-0.02', '----');
+&install_module('Tie-Hash-Static-0.01', '----');
+&install_module('Tie-Hash-Easy-0.01', '----');
+&install_module('Tie-Scalar-Easy-0.01', '----');
+&install_module('Tie-IxHash-1.21', 'authors/id/GSAR');
+&install_module('Tie-TransactHash-0.03', 'authors/id/MIKEDLR');
+&install_module('Tie-Handle-3.0', 'authors/id/STBEY');
+&install_module('Tie-STDERR-0.122', 'authors/id/JANPAZ');
+&install_module('Tie-LLHash-0.02', 'authors/id/KWILLIAMS');
+
+$BnP->end_section("tie");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("class","oo"); # Classes & Objects & Internals
+
+&install_module('Class-MethodMaker-0.92', 'authors/id/PSEIBEL');
+&install_module('Class-Visitor-0.02', 'authors/id/KMACLEOD');
+&install_module('AtExit-1.02', 'authors/id/BRADAPP');
+&install_module('Alias-2.31', 'authors/id/GSAR');
+&install_module('Memoize-0.46', 'authors/id/MJD');
+&install_module('Number-Format-1.12', 'authors/id/WRW');
+&install_module('Protect-1.00a', 'authors/id/JDUNCAN');
+&install_module('Taint-0.09', 'authors/id/PHOENIX');
+&install_module('Exceptions-0.01', 'authors/id/PSEIBEL');
+&install_module('HookPrePostCall-1.2', 'authors/id/PVERD', 'PrePostCall-1.2');
+&install_module('Religion-1.04', 'authors/id/KJALB');
+&install_module('FreezeThaw-0.3', 'authors/id/ILYAZ/modules');
+# &install_module('FreezeThaw-0_2', 'authors/id/ILYAZ/modules');
+&install_module('Inheritance-0.01', '----');
+&install_module('constant-0.01', 'authors/id/PHOENIX');
+&install_module('Class-Singleton-1.02', 'authors/id/ABW');
+&install_module('Class-Tom-2.03', 'authors/id/JDUNCAN');
+
+#   the Class-Eroot package needs special handling:
+$BnP->fetch('Class-Eroot-19960603.tar.gz', 'authors/id/DMR', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Class-Eroot-19960603.tar.gz' | tar xf -");
+$BnP->chdir("Class-Eroot");
+$BnP->mkdir("lib/Class");
+$BnP->system("mv Template.pm lib/Class/");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','Class::Eroot');\")",
+    ">Makefile.PL");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("Class-Eroot-19960603");
+$BnP->back();
+
+#   the EventServer needs special handling:
+$BnP->fetch('EventServer-2.3.tar.gz', 'authors/id/JACKS', $SourceDir);
+$BnP->mkdir('EventServer-2.3');
+$BnP->chdir("EventServer-2.3");
+$BnP->system("gunzip -c '$SourceDir/EventServer-2.3.tar.gz' | tar xf -");
+$BnP->mkdir("lib");
+$BnP->system("mv Server lib/");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','EventServer');\")",
+    ">Makefile.PL");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("EventServer-2.3");
+$BnP->back();
+
+$BnP->end_section("class","oo");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("system"); # System Stuff
+
+&install_module('Errno-1.09', 'authors/id/GBARR');
+&install_module('Error-0.12', 'authors/id/GBARR');
+&install_module('BSD-Resource-1.0701', 'authors/id/JHI');
+&install_module('Locale-Codes-1.00', 'authors/id/NEILB');
+&install_module('Startup-0.103', 'authors/id/MSCHWARTZ');
+
+$BnP->end_section("system");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("math"); # Mathematical Stuff, Data Types
+
+$BnP->begin_section("fox");
+&install_module('Bit-Vector-5.6', 'authors/id/STBEY');
+$BnP->end_section("fox");
+&install_module('Math-MatrixBool-5.0+', 'authors/id/STBEY',
+    'Math-MatrixBool-5.0');
+&install_module('Math-MatrixReal-1.2', 'authors/id/STBEY');
+&install_module('DFA-Kleene-1.0', 'authors/id/STBEY');
+&install_module('Set-IntRange-5.0', 'authors/id/STBEY');
+&install_module('Set-IntSpan-1.06', 'authors/id/SWMCD');
+&install_module('Set-Window-1.00', 'authors/id/SWMCD');
+&install_module('Set-Scalar-0_003', 'authors/id/JHI');
+&install_module('Math-VecStat-0.04', 'authors/id/JARW');
+&install_module('Math-Approx-0.200', 'authors/id/ULPFR');
+&install_module('Math-Trig-0.02', 'authors/id/JARW');
+&install_module('Math-Polynomial-0.02', 'authors/id/MATKIN');
+# &install_module('Math-Pari-0.94', 'authors/id/ILYAZ/modules');
+# (assembler complains about "operands given don't match any known
+# 386 instruction" in lines 103 and 115 of file plotport.c using
+# gcc 2.7.2.1 under FreeBSD 2.2.6)
+&install_module('MathRandom-0.6', 'authors/id/JVENIER', 'MathRandom');
+&install_module('Statistics-Descriptive-2.2', 'authors/id/COLINK');
+&install_module('graph-modules-1.001', 'authors/id/NEILB');
+&install_module('Bit-ShiftReg-2.0', 'authors/id/STBEY');
+&install_module('Interpolation-0.53', 'authors/id/MJD');
+&install_module('Math-MagicSquare-1.40', 'authors/id/FPIVARI');
+&install_module('Graph-0.003', 'authors/id/JHI');
+&install_module('Graph-Kruskal-2.0', 'authors/id/STBEY');
+
+$BnP->begin_section("graphics","image","pdl");
+
+# &install_module('PDL-1.9906', 'authors/id/LUKKA');
+# (compiler complains about undeclared symbols 'mess_sv' (line 402) and
+# 'in_eval' (line 488) of pdlcore.c, among others)
+
+$BnP->end_section("graphics","image","pdl");
+
+$BnP->end_section("math");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("getopt","opt"); # Options & Configuration
+
+$BnP->begin_section("fox");
+&install_module('GetoptLong-2.17', 'authors/id/JV');
+$BnP->end_section("fox");
+&install_module('Getopt-Mixed-1.008', 'authors/id/CJM');
+&install_module('Getopt-Regex-0.02', 'authors/id/JARW');
+&install_module('Getopt-Tabular-0.2', 'authors/id/GWARD');
+&install_module('IniConf.pm-0.92', 'authors/id/SHUTTON');
+&install_module('Resources-1.04', 'authors/id/FRANCOC');
+
+$BnP->end_section("getopt","opt");
+
+$BnP->begin_section("config","conf");
+
+#   the ConfigReader package needs special handling:
+$BnP->fetch('ConfigReader-0.5.tar.gz', 'authors/id/AMW', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/ConfigReader-0.5.tar.gz' | tar xf -");
+$BnP->chdir("ConfigReader-0.5");
+$BnP->mkdir("lib/ConfigReader");
+$BnP->system("mv *.pm lib/ConfigReader/");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','ConfigReader');\")",
+    ">Makefile.PL");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("ConfigReader-0.5");
+$BnP->back();
+
+$BnP->end_section("config","conf");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("data"); # Data and Data Debugging, Development
+
+$BnP->begin_section("fox");
+&install_module('Data-Locations-4.2', 'authors/id/STBEY');
+&install_module('Data-Dumper-2.09', 'authors/id/GSAR');
+
+$BnP->begin_section("net");
+&install_module('Storable-0.6@3.', 'authors/id/RAM', 'Storable-0.6@3');
+$BnP->end_section("net");
+
+$BnP->end_section("fox");
+
+&install_module('Data-Xtab-1.01', 'authors/id/BJEPS');
+
+$BnP->end_section("data");
+
+$BnP->begin_section("devel");
+
+&install_module('Alias-2.31', 'authors/id/GSAR');
+&install_module('perlbench-0.06', 'authors/id/GAAS');
+$BnP->begin_section("fox");
+# &install_module('DProf-19960930', 'authors/id/DMR');
+# &install_module('DProf-19970606', 'authors/id/DMR');
+&install_module('DProf-19970614', 'authors/id/DMR');
+# &install_module('DProf-19971213', 'authors/id/ILYAZ/modules');
+# (compiler complains about undeclared symbol 'defstash' in DProf.xs line 420)
+$BnP->end_section("fox");
+&install_module('Devel-Coverage-0.1', 'authors/id/RJRAY');
+&install_module('Devel-CCov-0.20', 'authors/id/JPRIT');
+&install_module('Devel-SmallProf-0.5', 'authors/id/ASHTED');
+&install_module('Devel-Symdump-2.00', 'authors/id/ANDK');
+&install_module('Devel-Peek-0.94', 'authors/id/ILYAZ/modules');
+&install_module('Devel-DebugInit-0.3', 'authors/id/JASONS');
+&install_module('Devel-WeakRef-0.003', 'authors/id/JGLICK');
+&install_module('Devel-Memo-0.004', 'authors/id/JGLICK');
+# &install_module('Devel-SawAmpersand-0.10', 'authors/id/ANDK');
+# (compiler complains about undeclared symbol 'sawampersand'
+# in SawAmpersand.xs line 20)
+
+$BnP->begin_section("swig");
+$BnP->fetch('swig1.1p5.tar.gz', 'authors/id/DBEAZLEY', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/swig1.1p5.tar.gz' | tar xf -");
+$BnP->chdir("SWIG1.1p5");
+$BnP->system("/bin/sh ./configure --prefix=\"$Prefix\"",
+    "--with-lang=PERL5", "--with-perl5=\"$Perl\"");
+$BnP->system("make");
+$BnP->system("make install");
+$BnP->back();
+$BnP->end_section("swig");
+
+$BnP->end_section("devel");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("time","date"); # Time & Date
+
+# &install_module('Date-GetDate-2.02', 'authors/id/ANDK');
+# (compiler complains about redeclared symbol 'timezone' in getdate.y
+# line 937 conflicting with /usr/include/time.h line 116 under FreeBSD 2.2.6)
+$BnP->begin_section("fox");
+&install_module('DateManip-5.33', 'authors/id/SBECK');
+&install_module('DateCalc-3.2', '----');
+# (from http://www.engelschall.com/u/sb/download/pkg/DateCalc-3.2.tar.gz)
+&install_module('Date-Calc-4.2', 'authors/id/STBEY');
+&install_module('TimeDate-1.08', 'authors/id/GBARR');
+$BnP->end_section("fox");
+&install_module('Time-modules-98.081201', 'authors/id/MUIR/modules');
+&install_module('Time-HiRes-01.18', 'authors/id/DEWEG');
+&install_module('BSD-Time-0.04', '----');
+&install_module('Period-1.20', 'authors/id/PRYAN');
+&install_module('Interval.0.02', 'authors/id/KTORP', 'Date');
+
+#   "*.tgz" file needs a little special handling:
+$BnP->fetch('DateConvert-0.14.tgz', 'authors/id/MORTY', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/DateConvert-0.14.tgz' | tar xf -");
+$BnP->chdir('DateConvert-0.14');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("DateConvert-0.14");
+$BnP->back();
+
+$BnP->end_section("time","date");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("file"); # Files and Paths
+
+$BnP->begin_section("fox");
+&install_module('File-Tools-2.0', 'authors/id/ASHER');
+&install_module('File-Copy-1.5', 'authors/id/ASHER', '', \&patch_skip);
+$BnP->end_section("fox");
+&install_module('File-PathConvert-0.4', 'authors/id/SHIGIO');
+&install_module('File-FindNCD-0.2', '----');
+&install_module('File-Slurp-98.071901', 'authors/id/MUIR/modules');
+&install_module('File-Flock-96.111802', 'authors/id/MUIR/modules');
+# &install_module('File-Lockf-0.20', 'authors/id/PHENSON');
+# (compiler complains about various undeclared symbols (like 'F_LOCK',
+# 'F_TLOCK' etc.) in lines 31,46,61,76 of lockf.xs)
+&install_module('File-Sync-0.06', 'authors/id/CEVANS');
+&install_module('File-Sort-0.11', 'authors/id/CNANDOR');
+&install_module('File-Spec-0.6', 'authors/id/KJALB');
+&install_module('File-Compare-1.1001', 'authors/id/NI-S');
+&install_module('File-LinkTree-1.06', 'authors/id/JPRIT');
+&install_module('File-Manifest-1.06', 'authors/id/JPRIT');
+&install_module('Filter-1.14', 'authors/id/PMQS');
+&install_module('Pathop-2.2', '----');
+&install_module('Rcs-0.07', 'authors/id/CFRETER');
+&install_module('MLDBM-2.00', 'authors/id/GSAR');
+&install_module('AsciiDB-TagFile-1.03', 'authors/id/JOSERODR');
+# &install_module('Logfile-Radius-1.14', 'authors/id/PAULG');
+$BnP->begin_section("net","fox");
+&install_module('Logfile-0.202', 'authors/id/ULPFR');
+$BnP->end_section("net","fox");
+&install_module('Logfile-Rotate-0.12', 'authors/id/PAULG');
+&install_module('LogCarp-1.12', 'authors/id/MIKEKING');
+&install_module('LockFile-Simple-0.1@0', 'authors/id/RAM');
+&install_module('Tail-0.60', 'authors/id/MGRABNAR');
+&install_module('SyslogScan-0.32', 'authors/id/RHNELSON');
+&install_module('Archive-Tar-0.08', 'authors/id/SRZ');
+&install_module('OLE-Storage-0.386', 'authors/id/MSCHWARTZ');
+&install_module('MultiTail-0.4', 'authors/id/SGMIANO');
+
+$BnP->end_section("file");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("db"); # Database Stuff
+
+$BnP->begin_section("fox");
+
+$BnP->begin_section("net");
+&install_module('pRPC-modules-0.1002', 'authors/id/JWIED');
+# &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+# (requires 'machine/ansi.ph' in syslog.ph line 74 which doesn't exist --
+# seems to be a bug in h2ph)
+$BnP->end_section("net");
+
+&install_module('DBI-1.02', 'authors/id/TIMB');
+$BnP->end_section("fox");
+
+&install_module('Sprite-3.21', 'authors/id/SHGUN');
+&install_module('CDB_File-0.7', 'authors/id/TIMPX');
+
+#  DB library and DB_File module:
+$BnP->ignore();
+# (linker complains about undefined symbol '_ftok' referenced from text
+# segment in os_map.o)
+$BnP->fetch('db-2.4.10.tar.gz', 'src/misc', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/db-2.4.10.tar.gz' | tar xf -");
+$BnP->chdir("db-2.4.10/build.unix");
+$BnP->patch("../os/os_config.c",
+    's!^(\s*imported\s+extern\s+)void(\s+\*\s*mmap\s+__P\b)!${1}char${2}!');
+# (compiler complains about conflicting types for 'mmap' in os/os_config.c
+# line 52 and /usr/include/sys/types.h line 165 under FreeBsd 2.2.6)
+$BnP->system("/bin/sh ../dist/configure");
+$BnP->system("make");
+$BnP->back(2);
+$BnP->resume();
+
+$BnP->fetch('DB_File-1.60.tar.gz', 'authors/id/PMQS', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/DB_File-1.60.tar.gz' | tar xf -");
+$BnP->chdir("DB_File-1.60");
+$BnP->patch("config.in", 's!^(INCLUDE\s+=\s+).+!\1../db-2.4.10/build.unix/!');
+$BnP->patch("config.in", 's!^(LIB\s+=\s+).+!\1../db-2.4.10/build.unix/!');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("DB_File-1.60");
+$BnP->back();
+
+$BnP->end_section("db");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("crypt","mime","encode","decode","uu","pgp"); # Encryption
+
+&install_module('MD5-1.7', 'authors/id/NWINT');
+&install_module('SHA-1.2', 'authors/id/UWEH');
+&install_module('Crypt-DES-1.0', 'authors/id/GARY');
+&install_module('Crypt-IDEA-1.0', 'authors/id/GARY');
+&install_module('PGP-0.3a', 'authors/id/GEHIC');
+&install_module('PGP-Sign-0.09', 'authors/id/RRA');
+$BnP->begin_section("fox");
+$BnP->begin_section("mail","news"); # Mail & News
+&install_module('MailTools-1.11', 'authors/id/GBARR');
+$BnP->end_section("mail","news"); # Mail & News
+&install_module('MIME-Base64-2.06', 'authors/id/GAAS');
+&install_module('MIME-tools-4.121', 'authors/id/ERYQ');
+&install_module('MIME-Lite-1.123', 'authors/id/ERYQ');
+&install_module('Convert-UU-0.20', 'authors/id/ANDK');
+$BnP->system("chmod 555 '$Prefix/bin/puuencode'");
+$BnP->system("chmod 555 '$Prefix/bin/puudecode'");
+$BnP->end_section("fox");
+&install_module('Unicode-Map-0.105', 'authors/id/MSCHWARTZ');
+&install_module('Unicode-Map8-0.05', 'authors/id/GAAS');
+&install_module('Unicode-String-2.01', 'authors/id/GAAS');
+&install_module('Convert-BER-1.1501', 'authors/id/GBARR');
+&install_module('Convert-BinHex-1.119', 'authors/id/ERYQ');
+&install_module('Convert-Recode-1.03', 'authors/id/GAAS');
+&install_module('Convert-EBCDIC-0.05', 'authors/id/CXL');
+&install_module('Convert-Translit-1.03', 'authors/id/GENJISCH');
+
+$BnP->end_section("crypt","mime","encode","decode","uu","pgp");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("zlib"); # ZLib and Perl glue modules
+
+$BnP->url(
+  'ftp://ftp.gimp.org/pub/gimp/libs',
+  'ftp://ftp.uu.net/pub/archiving/zip/zlibx',
+  'http://net.sw.engelschall.com/net.sw/System/Tools/FileUtils/Compress/zlib',
+  $Site, @URL );
+
+$BnP->fetch("zlib-1.1.2.tar.gz", '', $SourceDir);
+
+$BnP->url( $Site, @URL );
+
+$BnP->system("gunzip -c '$SourceDir/zlib-1.1.2.tar.gz' | tar xf -");
+$BnP->chdir("zlib-1.1.2");
+$BnP->system("/bin/sh ./configure");
+$BnP->system("make");
+$BnP->back();
+
+$BnP->fetch("Compress-Zlib-1.01.tar.gz", 'authors/id/PMQS', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Compress-Zlib-1.01.tar.gz' | tar xf -");
+$BnP->chdir("Compress-Zlib-1.01");
+$BnP->patch("Makefile.PL",
+    's!^#\$ZLIB_LIB.+!\$ZLIB_LIB = \'-L../zlib-1.1.2/\';!');
+$BnP->patch("Makefile.PL",
+    's!^#\$ZLIB_INCLUDE.+!\$ZLIB_INCLUDE = \'-I../zlib-1.1.2/\';!');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("Compress-ZLib-1.01");
+$BnP->back();
+
+$BnP->end_section("zlib");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("text"); # Text Processing
+
+&install_module('Text-Template-0.1b', 'authors/id/MJD');
+&install_module('Text-Tabs+Wrap-97.011701', 'authors/id/MUIR/modules');
+
+$BnP->fetch("Text-Trie-0.2.tar.Z", 'authors/id/ILYAZ/modules', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Text-Trie-0.2.tar.Z' | tar xf -");
+$BnP->chdir("Trie");
+$BnP->patch("Trie.pm", 's!^=head1 Name!=head1 NAME!');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages('Text-Trie-0.2');
+$BnP->back();
+
+&install_module('Text-German-0.03', 'authors/id/ULPFR');
+&install_module('Text-Vpp-1.01', 'authors/id/DDUMONT');
+&install_module('Text-Refer-1.106', 'authors/id/ERYQ');
+&install_module('Text-Boilerplate-0.08', '----');
+&install_module('Text-Striphigh-0.02', 'authors/id/JPC', 'Striphigh-0.02');
+&install_module('Text-CSV-0.01', 'authors/id/ALANCITT');
+&install_module('Text-Metaphone-0.02', 'authors/id/MSCHWERN');
+# &install_module('Text-Soundex-2.00', 'authors/id/MIKESTOK');
+&install_module('Text-Soundex-2.13', 'authors/id/MARKM');
+# &install_module('Text-Format0.52+NWrap0.11', 'authors/id/GABOR');
+&install_module('Text-Format0.52', 'authors/id/GABOR');
+&install_module('Text-MetaText-0.22', 'authors/id/ABW');
+# &install_module('Sort-PolySort-0.12', 'authors/id/DMACKS');
+# (README is missing, syntax error in PolySort.pm line 8)
+# &install_module('Regexp-0.004', 'authors/id/GBARR');
+# (symbol 'curpm' undeclared in Regexp.xs line 309)
+# &install_module('Regexp-0.001', 'authors/id/NI-S');
+# (symbol 'curpm' undeclared in Regexp.xs line 69)
+&install_module('ParseLex-2.02', 'authors/id/PVERD');
+&install_module('PLex-0.01', '----');
+&install_module('Data-ShowTable-3.3', 'authors/id/AKSTE');
+&install_module('String-Approx-2.7', 'authors/id/JHI');
+&install_module('String-ShellQuote-1.00', 'authors/id/ROSCH');
+&install_module('String-CRC-1.0', 'authors/id/MUIR/modules');
+&install_module('Array-Lookup-2.1', 'authors/id/AKSTE');
+&install_module('Array-PrintCols-2.1', 'authors/id/AKSTE');
+&install_module('Balanced-1.24', 'authors/id/DCONWAY');
+# &install_module('RecDescent-1.00', 'authors/id/DCONWAY');
+# (syntax error in Makefile.PL line 8)
+&install_module('NestedMatch-1.03', '----');
+&install_module('DelimMatch-1.03', 'authors/id/NWALSH');
+
+$BnP->end_section("text");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("tex","typesetting"); # Typesetting
+
+&install_module('TeX-Hyphen-0.06', 'authors/id/JANPAZ');
+&install_module('TeX-DVI-0.051', 'authors/id/JANPAZ');
+&install_module('TeX-DVI-Parse-0.02', 'authors/id/JANPAZ');
+&install_module('Font-TFM-0.06', 'authors/id/JANPAZ');
+
+$BnP->end_section("tex","typesetting");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("net"); # Networking
+
+$BnP->begin_section("fox");
+&install_module('libnet-1.0605', 'authors/id/GBARR');
+&install_module('Net-Telnet-3.01', 'authors/id/JROGERS');
+&install_module('Net-DNS-0.12', 'authors/id/MFUHR');
+&install_module('Net-ext-0.84', 'authors/id/SPIDB');
+# &install_module('Net-ext-0.84.sig', 'authors/id/SPIDB');
+&install_module('Net-Ident-1.11', 'authors/id/JPC');
+&install_module('Net-Whois-0.22', 'authors/id/CHIPS');
+$BnP->end_section("fox");
+
+&install_module('Net-Bind-0.01', 'authors/id/KJOHNSON');
+&install_module('Net-IRC-0.54', 'authors/id/FIMM');
+# &install_module('Net-IRC-0.5b', 'authors/id/FIMM');
+&install_module('Net-Daemon-0.02', 'authors/id/JWIED');
+&install_module('NetObj-1', '----');
+
+$BnP->begin_section("penguin");
+&install_module('Penguin-3.00', 'authors/id/FSG');
+&install_module('Penguin-Easy-1.1', 'authors/id/JDUNCAN');
+$BnP->end_section("penguin");
+
+&install_module('RPC-Simple-0.5', 'authors/id/DDUMONT');
+&install_module('Net-Pcap-0.01', 'authors/id/PLISTER'); # for FreeBSD2
+
+$BnP->end_section("net");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("mail","news"); # Mail & News
+
+$BnP->begin_section("fox");
+&install_module('MailFolder-0.07', 'authors/id/KJOHNSON');
+&install_module('POP3Client-1_17', 'authors/id/SDOWD');
+&install_module('NNTPClient-0.28', 'authors/id/RVA');
+&install_module('News-Newsrc-1.06', 'authors/id/SWMCD');
+$BnP->end_section("fox");
+&install_module('News-Article-1.13', 'authors/id/AGIERTH');
+
+$BnP->end_section("mail","news");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("www"); # World Wide Web
+
+$BnP->begin_section("fox");
+&install_module('libwww-perl-5.36', 'authors/id/GAAS');
+&install_module('CGI.pm-2.42', 'authors/id/LDS');
+&install_module('CGI-modules-2.76', 'authors/id/LDS');
+
+# This module's installation is interactive!
+$BnP->begin_lazy_section("modperl");
+&install_module('mod_perl-1.15', 'authors/id/DOUGM');
+$BnP->end_lazy_section("modperl");
+
+$BnP->end_section("fox");
+
+&install_module('LWPng-alpha-0.23', 'authors/id/GAAS');
+&install_module('LWP5emu-0.01_01', 'authors/id/GAAS');
+&install_module('CGI_Imagemap-1.00', 'authors/id/MIKEH');
+&install_module('CGI-Out-96.081401', 'authors/id/MUIR/modules');
+&install_module('CGI-Screen-0.121', 'authors/id/ULPFR');
+&install_module('CGI-BuildPage-0.95', 'authors/id/JANPAZ');
+&install_module('CGI-Validate-2.000', 'authors/id/ZENIN');
+&install_module('CGI_Lite-1.8', 'authors/id/SHGUN');
+&install_module('WWW-Search-1.021', 'authors/id/JOHNH');
+&install_module('Robot-0.011', 'authors/id/NEILB');
+&install_module('HTML-Parser-2.20', 'authors/id/GAAS');
+&install_module('HTML-Stream-1.44', 'authors/id/ERYQ');
+&install_module('HTML-Tree-0.51', 'authors/id/GAAS');
+&install_module('HTML-Table-0.90', 'authors/id/STLACY');
+&install_module('HTML-TableLayout-1.001006', 'authors/id/SFARRELL');
+&install_module('HTML-QuickCheck-1.0b1', 'authors/id/YLU');
+
+#   the HTML package needs special handling:
+$BnP->fetch('HTML-0.6.tar.gz', 'authors/id/GAND', $SourceDir);
+$BnP->mkdir('HTML-0.6');
+$BnP->chdir("HTML-0.6");
+$BnP->system("gunzip -c '$SourceDir/HTML-0.6.tar.gz' | tar xf -");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','HTML::Base');\")",
+    ">Makefile.PL");
+$BnP->system("mv HTML/*.pm .");
+$BnP->system("cat html_base.pod >>Base.pm");
+$BnP->system("rm -f html_base.pod; rmdir HTML");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("HTML-0.6");
+$BnP->back();
+
+&install_module('HTTPD-Tools-0.55', 'authors/id/DOUGM');
+&install_module('Netscape-History-2.02', 'authors/id/NEILB');
+&install_module('Netscape-Cache-0.42', 'authors/id/SREZIC');
+
+$BnP->begin_section("fox");
+&install_module('eperl-2.2.14', 'authors/id/RSE');
+&install_module('VRML-1.04', 'authors/id/HPALM');
+# &install_module('VRML-1.04de', 'authors/id/HPALM');
+# &install_module('VRML-Browser-0.01', 'authors/id/LUKKA');
+# (files <GL/gl.h>, <GL/glu.h> and <GL/glx.h> are missing
+# in VRMLFunc.xs lines 7,8,9)
+$BnP->end_section("fox");
+
+$BnP->end_section("www");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("graphics","image","ps"); # Image Processing
+
+$BnP->begin_section("fox");
+&install_module('GD-1.18', 'authors/id/LDS');
+&install_module('chart-0.94', 'authors/id/DBONNER', 'Chart-0.94');
+&install_module('GIFgraph-1.10', 'authors/id/MVERB');
+&install_module('Image-Size-2.7', 'authors/id/RJRAY');
+$BnP->end_section("fox");
+
+#   the PostScript package needs special handling:
+$BnP->fetch('ps.tar.gz', '----', $SourceDir);
+$BnP->mkdir('PS');
+$BnP->chdir("PS");
+$BnP->system("gunzip -c '$SourceDir/ps.tar.gz' | tar xf -");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','PS');\")",
+    ">Makefile.PL");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("PS");
+$BnP->back();
+
+$BnP->ignore(); # package name conflict with JHI's "Graph" series!!!
+#   the Graph package needs special handling:
+$BnP->fetch('Graph-0.9.tar.gz', '----', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Graph-0.9.tar.gz' | tar xf -");
+$BnP->chdir("Graph-0.9");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','Graph');\")",
+    ">Makefile.PL");
+$BnP->patch("Graph.pm", 's!\r$!!');
+$BnP->patch("Graph.pm.html", 's!\r$!!');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("Graph-0.9");
+if ($HTML)
+{   # would overwrite Graph.html from Graph.pm:
+    $BnP->system("cp Graph.pm.html '$HTMLROOT/mod/Graph2.html';",
+        "chmod 444 '$HTMLROOT/mod/Graph2.html'");
+    $BnP->system("echo 'Graph-0.9 Graph.pm.html mod/Graph2.html'",
+        ">>'$MANIFEST'");
+}
+$BnP->back();
+$BnP->resume();
+
+&install_module('PDF-1.06', 'authors/id/ANTRO', 'PDF');
+# &install_module('PDFprint-3.1', 'authors/id/FPIVARI');
+# (no Makefile.PL, no *.pm, no *.pl files)
+
+$BnP->end_section("graphics","image","ps");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("term"); # Terminal
+
+#   the GNU Readline package needs special handling:
+$BnP->fetch('readline-2.2.tar.gz', '----', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/readline-2.2.tar.gz' | tar xf -");
+$BnP->chdir("readline-2.2/");
+$BnP->system("CC=`\"$Perl\" -e 'use Config; print \$Config{\"cc\"}, \"\\n\"'`",
+    "./configure");
+$BnP->system("make");
+$BnP->system("mv libreadline.a libmyreadline.a");
+$BnP->back();
+
+$BnP->fetch('Term-ReadLine-Gnu-1.00.tar.gz', 'authors/id/HAYASHI', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Term-ReadLine-Gnu-1.00.tar.gz' | tar xf -");
+$BnP->chdir("Term-ReadLine-Gnu-1.00");
+$BnP->patch("Makefile.PL",
+    's!-lreadline -ltermcap!-lmyreadline -ltermcap!',
+    's!-L/usr/local/gnu/lib!-L../readline-2.2/!',
+    's!-L/usr/local/gnu/lib!-L../readline-2.2/!',
+    's!-I/usr/local/gnu/include!-DREADLINE_LIBRARY -I../readline-2.2!');
+$BnP->patch("Gnu.xs",
+    's!#include <readline/(.+?)>!#include "$1"!g');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("Term-ReadLine-Gnu-1.00");
+$BnP->back();
+
+&install_module('Term-ReadLine-Perl-0.9904', 'authors/id/ILYAZ/modules');
+&install_module('TermReadKey-2.12', 'authors/id/KJALB');
+&install_module('Term-Size-0.2', 'authors/id/TIMPX');
+&install_module('Term-Info-1.0', 'authors/id/KJALB', 'Info');
+&install_module('Term-Query-2.0', 'authors/id/AKSTE');
+&install_module('ANSIColor-1.01', 'authors/id/RRA');
+&install_module('Expect.pm-1.07', 'authors/id/AUSCHUTZ');
+
+$BnP->end_section("term");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_section("gui"); # GUI Stuff (Curses, X11, Perl Tk)
+
+$BnP->begin_section("curses");
+
+#   the Curses package needs special handling and configuration;
+#   currently, FreeBSD 2.*.* is assumed!
+$BnP->fetch('Curses-1.02.tar.gz', 'authors/id/WPS', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Curses-1.02.tar.gz' | tar xf -");
+$BnP->chdir("Curses-1.02");
+$BnP->system("rm -f c-config.h; ln hints/c-freebsd.ncurses.h c-config.h");
+#                                          ^^^^^^^
+#                                          !!!!!!!
+$BnP->patch("Makefile.PL",
+    's!my \$inc;!my \$inc = \"\";!',
+    's!my \$libs;!my \$libs = \"-lncurses -ltermcap\";!');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("Curses-1.02");
+$BnP->back();
+
+#   the Cdk package needs special handling:
+$BnP->ignore();
+$BnP->fetch('Curses-Devkit-4.9.3.tar.gz', 'authors/id/GLOVER', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/Curses-Devkit-4.9.3.tar.gz' | tar xf -");
+$BnP->chdir("Cdk");
+#$BnP->patch("Makefile.PL", "s!!!"); # yet to be worked out, see README of Cdk
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("Cdk");
+$BnP->back();
+$BnP->resume();
+
+$BnP->end_section("curses");
+
+#   PerlVision needs special handling:
+$BnP->fetch('perlvision.tgz', 'authors/id/AGUL', $SourceDir);
+$BnP->mkdir('PerlVision');
+$BnP->chdir("PerlVision");
+$BnP->system("gunzip -c '$SourceDir/perlvision.tgz' | tar xf -");
+$BnP->system("(echo '#!perl';",
+    "echo 'use ExtUtils::MakeMaker;';",
+    "echo \"WriteMakefile('NAME','PV');\")",
+    ">Makefile.PL");
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("PerlVision");
+$BnP->mkdir("$Prefix/man/cat3");
+$BnP->system("cp PerlVision.doc '$Prefix/man/cat3/PV.3';",
+    "chmod 444 '$Prefix/man/cat3/PV.3'");
+if ($HTML)
+{
+    $BnP->system("(echo '<html><pre>'; cat PerlVision.doc;",
+        "echo '</pre></html>') >'$HTMLROOT/mod/PV.html'");
+    $BnP->system("echo 'PerlVision PerlVision.doc mod/PV.html'",
+        ">>'$MANIFEST'");
+}
+$BnP->back();
+
+$BnP->begin_section("x11");
+&install_module('X11-Protocol-0.04', 'authors/id/SMCCAM');
+$BnP->end_section("x11");
+
+$BnP->begin_section("tk","ptk","fox"); # Perl Tk
+&install_module('Tk800.011', 'authors/id/NI-S');
+&install_module('Tk-FileDialog-1.3', 'authors/id/BPOWERS');
+&install_module('Tk-GBARR-1.03', 'authors/id/GBARR');
+&install_module('Tk-Getopt-0.34', 'authors/id/SREZIC');
+&install_module('Tk-JPEG-2.011', 'authors/id/NI-S');
+&install_module('Tk-ProgressBar-1.0', 'authors/id/BPOWERS');
+&install_module('Tk-SelFile-0.02', 'authors/id/ALSCH');
+&install_module('Tk-WaitBox-1.2', 'authors/id/BPOWERS');
+&install_module('Tk-Multi-0.71', 'authors/id/DDUMONT');
+&install_module('Tk-HTML-3.002', 'authors/id/NI-S');
+$BnP->end_section("tk","ptk","fox");
+
+$BnP->end_section("gui");
+
+# --------------------------------------------------------------------------- #
+
+$BnP->begin_lazy_section("cpan"); # CPAN Modules
+
+# These module installations are interactive!
+
+$BnP->fetch('CPAN-1.40.tar.gz', 'authors/id/ANDK', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/CPAN-1.40.tar.gz' | tar xf -");
+$BnP->chdir('CPAN-1.40');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("CPAN-1.40");
+$BnP->back();
+
+$BnP->system("(echo '#!/bin/sh'; echo \"exec '$Perl'",
+    "-MCPAN -e shell\") >'$Prefix/bin/cpan';",
+    "chmod 555 '$Prefix/bin/cpan'");
+
+$BnP->fetch('CPAN-WAIT-0.24.tar.gz', 'authors/id/ULPFR', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/CPAN-WAIT-0.24.tar.gz' | tar xf -");
+$BnP->chdir('CPAN-WAIT-0.24');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("CPAN-WAIT-0.24");
+$BnP->back();
+
+#  &install_module('CPAN-Site-0.013', 'authors/id/ULPFR');
+$BnP->fetch('CPAN-Site-0.013.tar.gz', 'authors/id/ULPFR', $SourceDir);
+$BnP->system("gunzip -c '$SourceDir/CPAN-Site-0.013.tar.gz' | tar xf -");
+$BnP->chdir('CPAN-Site-0.013');
+$BnP->system("'$Perl' Makefile.PL");
+$BnP->system("make");
+$BnP->system("make install UNINST=1");
+&install_tree_manpages("CPAN-Site-0.013");
+$BnP->back();
+
+$BnP->end_lazy_section("cpan");
+
+# =========================================================================== #
+
+$BnP->end_section("modules");
+
+# =========================================================================== #
+
+$BnP->begin_must_section();
+
+if ($HTML)
+{
+    $BnP->system("cat '$MANIFEST' | sort -u >'$MANIFEST.sort'");
+    $BnP->system("mv '$MANIFEST.sort' '$MANIFEST'");
+}
+
+$BnP->end_must_section();
+
+# =========================================================================== #
+
+$BnP->end();
+
+# =========================================================================== #
+
+__END__
+

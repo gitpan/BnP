@@ -1,0 +1,78 @@
+#!/bin/sh
+
+# This file contains a collection of some typical
+# (i.e., often used during testing) commands:
+
+##############
+# Hide Perl: #
+##############
+
+#PATH="`echo \"$PATH\" | sed -e \
+#'s|/opt/bin||g; \
+# s|/sw/bin||g; \
+# s|/u/root/bin||g; \
+# s|:::*|:|g; s|^:||; s|:$||'`"
+#export PATH
+#echo "PATH = '$PATH'"
+#which perl
+#which perl5
+#which miniperl
+
+##################
+# FreeBSD 2.2.6: #
+##################
+
+#nohup ./build -p /tmp/bnp tools.patch.gmake.snarf >out 2>err &
+#nohup ./build -p /tmp/bnp sfio >out 2>err &
+#nohup ./build -p /tmp/bnp perl.core.date >out 2>err &
+
+#nohup ./build -g -p /sw -r tools tools.patch.gmake.snarf >out 2>err &
+#nohup ./build -g -p /sw -r tools sfio >out 2>err &
+#nohup ./build -g -p /sw -r graphics gimp >out 2>err &
+#nohup ./build -g -p /sw -r lang perl.core.date >out 2>err &
+
+#BNP_FLAGS="-Dcc=pgcc -Doptimize=-O2" nohup ./build -g -p /sw -s /Modules -r lang perl >out 2>err &
+#nohup ./build -g -p /sw bnp clean >out 2>err &
+
+#nohup ./build -g -p /sw -r graphics gimp >out 2>err &
+#nohup ./build -g -p /sw -r graphics imagick >out2 2>err2 &
+
+################
+# SunOS 4.1.3: #
+################
+
+#patch perl.bnp <perl.bnp.diff.sunos
+#BNP_FLAGS="-Dcc=gcc" nohup ./build -g -p /test -u ftp://bsdti7.sdm.de/pub/CPAN -r lang perl >out 2>err &
+
+################
+# HP-UX 10.01: #
+################
+
+#patch perl.bnp <perl.bnp.diff.hpux
+#nohup ./build -g -p /sw -u ftp://bsdti7.sdm.de/pub/CPAN -r tools tools >out 2>err &
+#nohup ./build -g -p /sw -u ftp://bsdti7.sdm.de/pub/CPAN -r tools sfio >out 2>err &
+#nohup ./build -g -p /sw -u ftp://bsdti7.sdm.de/pub/CPAN -r lang perl >out 2>err &
+#nohup ./build -g -p /sw bnp clean >out 2>err &
+
+################
+# Solaris 2.6: #
+################
+
+#patch perl.bnp <perl.bnp.diff.solaris2
+#PATH="/tmp/sw/bin:$PATH"
+#export PATH
+#nohup ./build -g -p /tmp/sw -s /u/sb/.www/download/bnp/packages -r tools tools >out 2>err &
+#nohup ./build -g -p /tmp/sw -s /u/sb/.www/download/bnp/packages -r lang perl >out 2>err &
+
+#################
+# Linux 2.0.25: #
+#################
+
+#patch perl.bnp <perl.bnp.diff.linux
+#nohup ./build -g -p /home/sb/sw -u ftp://bsdti7.sdm.de/pub/CPAN -r lang perl >out 2>err &
+#nohup ./build -g -p /home/sb/sw bnp clean >out 2>err &
+
+#########
+## EOF ##
+#########
+

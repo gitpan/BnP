@@ -1,0 +1,218 @@
+     ____          _  _      _  _         _  ____   _
+    | __ )  _   _ (_)| |  __| |( ) _ __  ( )|  _ \ | |  __ _  _   _
+    |  _ \ | | | || || | / _` ||/ | '_ \ |/ | |_) || | / _` || | | |
+    | |_) || |_| || || || (_| |   | | | |   |  __/ | || (_| || |_| |
+    |____/  \__,_||_||_| \__,_|   |_| |_|   |_|    |_| \__,_| \__, |
+                                                              |___/
+
+
+Installation:
+=============
+
+Fuer Installationsanweisungen siehe die Datei "INSTALL.de" in dieser
+Distribution.
+
+
+Was ist "Build'n'Play"?
+=======================
+
+"Build'n'Play" ist ein Batch-Werkzeug fuer System-Administratoren, die immer
+wieder dieselben Software-Pakete (einschliesslich Perl, aber nicht auf dieses
+beschraenkt) auf den verschiedensten Unix-Plattformen installieren muessen
+(zum Beispiel fuer den periodischen Upgrade oder die Neuinstallation von
+Unix-Rechnern).
+
+Das wichtigste Feature von "Build'n'Play" besteht dabei in seiner Faehigkeit,
+nach einem Abbruch (z.B. aufgrund eines Compiler-Fehlers) automatisch wieder
+an der Abbruchstelle aufzusetzen (nachdem man das betreffende Problem manuell
+geloest hat).
+
+"Build'n'Play" besteht im wesentlichen aus drei Teilen (plus einem optionalen
+Teil): Einem Shell-Skript, um die Batch-Jobs zu starten und die Kommandozeilen-
+Optionen des Benutzers zu verarbeiten (sowie fuer das Bootstrapping von Perl,
+falls erforderlich), einem Perl-Modul, welches den automatischen Wiederaufsatz-
+Mechanismus zur Verfuegung stellt, und diversen Perl-Skripten, die die eigent-
+liche Installation durchfuehren.
+
+Zusaetzlich ist ein (optionales) Werkzeug vorhanden, um eine saubere Instal-
+lationshierarchie zu verwalten, in der jedes Software-Paket in einem eigenen
+und separaten Unterverzeichnisbaum abgelegt wird, was das (auch spaetere)
+Zusammenfassen von thematisch zusammengehoerenden Software-Paketen in ge-
+meinsamen (hierarchisch organisierten) Unterverzeichnissen sowie eine leichte
+und garantiert rueckstandsfreie De-Installation erlaubt (im Gegensatz zur
+pauschalen Installation nach "/usr/local", beispielsweise).
+
+Dieses letztere Werkzeug (auch ein Shell-Skript) laesst sich uebrigens
+auch voellig unabhaengig vom Rest von "Build'n'Play" einsetzen.
+
+(Mehr Details zu diesem Werkzeug (auf Deutsch) siehe in der Datei
+"genopt.txt" in dieser Distribution bzw. unter "man 3 genopt" nach
+der Installation von "Build'n'Play".)
+
+Beachten Sie, dass bei der ersten Installation mit "Build'n'Play" die
+mitgelieferten Installationsskripte noch an Ihr Betriebssystem und Ihre
+persoenlichen Vorlieben (oder Firmen-Standards) angepasst werden muessen.
+
+Erwarten Sie daher nicht, dass der erste Installationsversuch ohne irgend
+einen Abbruch durchlaeuft.
+
+Die noetigen Anpassungen werden fuer einige Betriebssysteme durch "diffs"
+erleichtert (zumindest fuer das "Perl" Installations-Skript), die in dieser
+Distribution bereits enthalten sind und die man mit Hilfe des bekannten
+"patch"-Werkzeugs (eine weitere geniale Erfindung von Perl's Vater Larry
+Wall!) auf das "Perl" Installations-Skript anwenden kann.
+
+Diese Investition an Anpassungsaufwand lohnt sich natuerlich nur, wenn man
+die betreffenden Software-Pakete mehr als nur einmal installieren muss.
+Alternativ dazu kann man jedoch auch einfach diejenigen (Perl-) Module aus-
+kommentieren, die Probleme bereiten, und sich mit dem Rest (es sind einige
+Hunderte vorhanden) begnuegen.
+
+Da es bereits ein sehr maechtiges Installationswerkzeug namens "CPAN.pm"
+fuer Perl-Module (und Bundles ("Buendel") von Perl-Modulen) gibt (siehe
+die "CPAN(3)" Manual Page in Ihrer Perl-Installation fuer mehr Details),
+erhebt sich natuerlich die Frage, wozu ein weiteres Werkzeug, und was ist
+der Unterschied zwischen den beiden?
+
+Kurz gesagt ist "Build'n'Play" ein Werkzeug zur Installation _BELIEBIGER_
+Software-Pakete (z.B. um ganze Unix-Server mit allen benoetigten Software-
+Paketen einzurichten), das sich zur Erreichung dieses Ziels lediglich der
+Programmiersprache "Perl" bedient, waehrend "CPAN.pm" ein auf Perl-Module
+spezialisiertes (was einige Vorteile mit sich bringt), aber auch
+beschraenktes Werkzeug ist.
+
+Eine ausfuehrlichere tabellarische Gegenueberstellung der verschiedenen
+Features von "Build'n'Play" und "CPAN.pm" ist in der Datei "README.txt"
+in dieser Distribution zu finden.
+
+
+Autoren:
+========
+
+Die Idee und erste private Versionen von "Build'n'Play" stammen von:
+
+  Ralf S. Engelschall
+
+  rse@engelschall.com
+  www.engelschall.com
+
+Die vorliegende erste oeffentliche Programmversion (eine vollstaendige
+Neuentwicklung) von "Build'n'Play" stammt von:
+
+  Steffen Beyer
+
+   sb@sdm.de
+   sb@engelschall.com
+  www.engelschall.com/u/sb/download/
+
+
+Urheberrechte:
+==============
+
+Copyright (c) 1996 - 1998 by Ralf S. Engelschall.
+Alle Rechte vorbehalten.
+
+Copyright (c) 1998 by Steffen Beyer.
+Alle Rechte vorbehalten.
+
+
+Lizenz:
+=======
+
+"Build'n'Play" ist Freie Software und kann unter denselben Lizenzbedingungen
+benutzt, modifiziert und weitergegeben werden wie Perl, d.h. es gelten die
+Bestimmungen der "Artistic License" oder (wahlweise) der "GNU General Public
+License".
+
+Bitte beachten Sie die beiden Dateien "Artistic.txt" und "GNU_GPL.txt" in
+dieser Distribution fuer die entsprechenden Details!
+
+
+Haftungsausschluss:
+===================
+
+Die vorliegende Software wird so zur Verfuegung gestellt wie sie ist, es
+werden keinerlei Garantien fuer ihre Eignung fuer welche Zwecke auch immer
+abgegeben, und es wird auch keine Haftung fuer die durch ihre Verwendung
+oder Nichtverwendbarkeit moeglicherweise verursachten Schaeden oder Ausfaelle
+oder dergleichen uebernommen, selbst wenn dem Autor solche moeglichen Folgen
+bekannt sein oder bekannt gemacht werden sollten.
+
+Siehe dazu auch die "GNU General Public License" fuer weitere Details.
+
+
+Danksagungen:
+=============
+
+Mein ganz besonderer Dank gilt:
+
+- Michael Gerth <mic@oreilly.de> vom O'Reilly Verlag Koeln,
+  von dem dieses Projekt ausging und der es nach Kraeften gefoerdert und
+  unterstuetzt hat,
+
+- meinem Arbeitgeber, software design & management GmbH & Co. KG (sd&m)
+  (http://www.sdm.de/), und zwar hier besonders in Person meines Bereichs-
+  und meines Geschaeftsbereichsleiters Ulrich Bonfig <bonfig@sdm.de> und
+  Ruediger Azone <azone@sdm.de>, die mir unbuerokratisch diese Nebentaetig-
+  keit gestattet haben, sowie
+
+- Ralf S. Engelschall <rse@engelschall.com>,
+  dem urspruenglichen Autor von "Build'n'Play",
+
+die alle drei dieses Projekt ueberhaupt erst moeglich gemacht haben.
+
+Ausserdem bin ich den Beta-Testern
+
+        Marc Lehmann   <pcg@goof.com>,
+        Robert Aussem  <raussem@cscploenzke.de> und
+        Eike Grote     <eike.grote@btp4x8.phy.uni-bayreuth.de>
+
+fuer ihre Muehen und ihre Geduld sowie die vielen Anregungen und Ver-
+besserungsvorschlaege natuerlich besonders verpflichtet. Viele ihrer
+Verbesserungsvorschlaege sind in dieses Projekt mit eingeflossen!
+
+Fuer das zur-Verfuegung-Stellen von Accounts fuer Testzwecke auf je einem
+Linux-Rechner und einer HP bin ich Gottfried Bartmuss <gob@sdm.de> und
+Andreas Haeusler <andreas@sdm.de> ganz besonders dankbar.
+
+Fuer den freien Zugang zu einem Web-Server mit eigenem Account sowie einem
+eigenen WWW- und FTP-Bereich bin ich Ralf S. Engelschall sowie der Eidge-
+noessischen Technischen Hochschule Zuerich (ETHZ) in der Schweiz (die den
+Rechner, eine SPARC-Station mit Solaris 2.6, freundlicherweise Ralf S.
+Engelschall zur freien Verfuegung gestellt hat, der mir dann wiederum den
+Zugang darauf ermoeglicht hat) hochgradig zu Dank verpflichtet.
+
+Die Moeglichkeit, ueber einen lokalen CPAN-Mirror-Server im LAN mit einer
+rasanten Zugriffszeit sowie ueber einen CD-Brenner in demselben LAN (fuer
+die Erstellung des CPAN-Snapshots) verfuegen zu koennen, verdanke ich sd&m.
+
+Schliesslich bin ich auch noch einem unentschlossenen Kunden von sd&m
+(der hier nicht genannt werden soll) zu Dank verpflichtet, der mir durch
+die uns von ihm auferlegten Wartezeiten die noetige "Luft" verschafft hat,
+um auch unvorhergesehene Aufwaende in diesem Projekt zu bewaeltigen.
+
+
+Bekannte Fehler:
+================
+
+1) Die Installationen von "Gimp" und "ImageMagick" funktionieren zwar, sind
+   aber trotzdem noch unvollstaendig; die Unterstuetzung verschiedener Grafik-
+   Formate fehlt noch (diese werden nicht korrekt eingebunden).
+
+2) Das Tool "bzip2" laesst sich unter FreeBSD (2.2.6) nicht kompilieren;
+   "ld" beschwert sich: "-lbz2: no match".
+   Loesung: Verwenden Sie statt dessen die etwas aeltere Version von "bzip2",
+   die bereits in der Distribution von FreeBSD enthalten ist.
+
+Alle Tips zur Behebung der obigen Probleme sind hochwillkommen!
+
+
+Sonstiges:
+==========
+
+Wenn Sie in "Build'n'Play" Fehler finden oder Unterstuetzung benoetigen,
+wenden Sie sich bitte an Steffen Beyer <sb@engelschall.com>.
+
+Vielen Dank!
+
+

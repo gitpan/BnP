@@ -1,0 +1,166 @@
+#!perl
+
+require 5.000;
+
+###############################################################################
+##                                                                           ##
+##    This is the "sfio.bnp" Perl script of "Build'n'Play" (BnP).            ##
+##                                                                           ##
+##    (The script which knows how to install "sfio" (safe/fast i/o)          ##
+##     from CPAN, the "Comprehensive Perl Archive Network".)                 ##
+##                                                                           ##
+##    Copyright (c) 1998 by Steffen Beyer. All rights reserved.              ##
+##                                                                           ##
+##    This program is free software; you can redistribute it                 ##
+##    and/or modify it under the same terms as Perl, i.e., either            ##
+##    the "Artistic License" or the "GNU General Public License".            ##
+##                                                                           ##
+###############################################################################
+
+###############################################################################
+##                                                                           ##
+##    This version of "sfio.bnp" was developed with support from O'Reilly    ##
+##    Verlag and was first published on the CD-ROM accompanying the book     ##
+##    "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999).               ##
+##                                                                           ##
+##    Diese Version von "sfio.bnp" entstand mit Unterstuetzung des O'Reilly  ##
+##    Verlag und wurde erstmalig auf der CD-ROM zum Buch "Programmieren      ##
+##    mit Perl-Modulen" (O'Reilly Verlag 1999) veroeffentlicht.              ##
+##                                                                           ##
+###############################################################################
+
+package BnP::sfio;
+
+BEGIN { unshift(@INC, pop(@ARGV)); }
+
+use BnP;
+
+##
+## Note that we cannot use any other "use" here at all, because in most
+## cases, this will require the "Exporter" module, which miniperl (used
+## for bootstrapping) does not provide (nor any other module)!
+##
+
+####################################################
+##                                                ##
+##  Begin of user configurable constants section  ##
+##                                                ##
+####################################################
+
+# What are the URLs of your favourite (= fastest) CPAN
+# mirror sites? (E.g. @URL = ( 'http://www.perl.com/CPAN',
+# 'ftp://ftp.funet.fi/pub/languages/perl/CPAN' ); etc.)
+# (The URLs should end with "CPAN" and should not
+# have a trailing slash "/". The URLs will be tried
+# in the given order, from top to bottom.)
+#
+@URL =
+(
+    'ftp://ftp.funet.fi/pub/languages/perl/CPAN',
+    'http://www.perl.com/CPAN',
+    # (The latter supplies automatic redirection
+    # to a web site "near" you.)
+    'ftp://ftp.engelschall.com/pub/bnp/packages'
+);
+
+####################################################
+##                                                ##
+##   End of user configurable constants section   ##
+##                                                ##
+####################################################
+
+##
+## Internal identification constants:
+##
+
+$VERSION = "2.1.0 (09-Nov-1998)";  ##  no 'my' for MakeMaker!
+
+##
+## Fetch our remaining private parameters:
+##
+
+my $Path = pop(@ARGV);
+my $Stub = pop(@ARGV);
+my $Site = pop(@ARGV);
+my $Perl = pop(@ARGV);
+
+##
+## Declaration of global variables:
+##
+
+my $SourceDir;
+my $Distrib;
+my $Prefix;
+my $BnP;
+
+##
+## Check some basic requirements:
+##
+
+&indispensable
+(
+    'sh',
+    'tar',
+    'make',
+    'gunzip'
+);
+
+##
+## Main:
+##
+
+# =========================================================================== #
+
+$BnP = BnP->new( @ARGV );
+
+$Prefix = $BnP->prefix();
+
+$Distrib = $BnP->workspace() . "/sfio";
+
+$SourceDir = $BnP->homedir() . "/src";
+
+# =========================================================================== #
+
+$BnP->begin();
+
+$BnP->path( $Path );
+
+$BnP->stub( $Stub );
+
+$BnP->url( $Site, @URL );
+
+# =========================================================================== #
+
+$BnP->mkdir($Distrib);
+$BnP->chdir($Distrib);
+
+$BnP->fetch("sfio97.src.unix.tar.gz", 'src/misc', $SourceDir);
+
+$BnP->system("gunzip -c '$SourceDir/sfio97.src.unix.tar.gz' | tar xf -");
+
+$BnP->chdir("src/lib/sfio");
+$BnP->system("make");
+$BnP->system("make install");
+
+$BnP->chdir("../sfdisc");
+$BnP->system("make");
+$BnP->system("make install");
+
+$BnP->mkdir("$Prefix/bin");
+$BnP->mkdir("$Prefix/lib");
+$BnP->mkdir("$Prefix/include");
+$BnP->mkdir("$Prefix/man/man3");
+
+$BnP->system("cp -p '$Distrib/bin/'* '$Prefix/bin'");
+$BnP->system("cp -p '$Distrib/lib/'* '$Prefix/lib'");
+$BnP->system("cp -p '$Distrib/include/'* '$Prefix/include'");
+$BnP->system("cp -p '$Distrib/man/man3/'* '$Prefix/man/man3'");
+
+# =========================================================================== #
+
+$BnP->end();
+
+# =========================================================================== #
+
+__END__
+

@@ -1,0 +1,208 @@
+*** perl.bnp.orig	Mon Nov  9 07:30:03 1998
+--- perl.bnp	Mon Nov  9 07:30:05 1998
+***************
+*** 375,380 ****
+--- 375,382 ----
+      $BnP->system("make");
+      $BnP->system("make install UNINST=1");
+      &install_tree_manpages($distname);
++     $BnP->system('find . -type f -exec rm -f {} \;');
++     $BnP->system("cd '$SourceDir';", 'rm -f *');
+      $BnP->back();
+  }
+  
+***************
+*** 459,464 ****
+--- 461,470 ----
+  &install_manpage($PerlVersion, "utils/h2xs", "h2xs.html", "x2p");
+  &install_manpage($PerlVersion, "lib/ExtUtils/xsubpp", "xsubpp.html", "x2p");
+  
++ #   clean up to use minimal temporary workspace:
++ $BnP->system('find . -type f -exec rm -f {} \;');
++ $BnP->system("cd '$SourceDir';", 'rm -f *');
++ 
+  #   from inside the perl distribution, back to workspace:
+  $BnP->back(); # (BTW, we could use "reset()" here just as well.)
+  
+***************
+*** 563,569 ****
+  
+  # --------------------------------------------------------------------------- #
+  
+! $BnP->begin_section("bison"); # GNU Bison for Perl 5
+  
+  if (find('install', $ENV{'PATH'}) eq '')
+  {
+--- 569,575 ----
+  
+  # --------------------------------------------------------------------------- #
+  
+! $BnP->begin_lazy_section("bison"); # GNU Bison for Perl 5
+  
+  if (find('install', $ENV{'PATH'}) eq '')
+  {
+***************
+*** 575,587 ****
+  $BnP->system("gunzip -c '$SourceDir/perl-bison-1.25.1.00.tar.gz' | tar xf -");
+  $BnP->chdir("perl-bison-1.25");
+  $BnP->system("/bin/sh ./configure --prefix=\"$Prefix\"");
+  $BnP->system("make");
+  $BnP->system("make install");
+  $BnP->back();
+  
+  $BnP->resume();
+  
+! $BnP->end_section("bison");
+  
+  # --------------------------------------------------------------------------- #
+  
+--- 581,594 ----
+  $BnP->system("gunzip -c '$SourceDir/perl-bison-1.25.1.00.tar.gz' | tar xf -");
+  $BnP->chdir("perl-bison-1.25");
+  $BnP->system("/bin/sh ./configure --prefix=\"$Prefix\"");
++ $BnP->patch("Makefile", 's!/usr/bin/install\b!/usr/sbin/install!');
+  $BnP->system("make");
+  $BnP->system("make install");
+  $BnP->back();
+  
+  $BnP->resume();
+  
+! $BnP->end_lazy_section("bison");
+  
+  # --------------------------------------------------------------------------- #
+  
+***************
+*** 971,977 ****
+  $BnP->begin_section("fox");
+  
+  $BnP->begin_section("net");
+! &install_module('pRPC-modules-0.1002', 'authors/id/JWIED');
+  # &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+  # (requires 'machine/ansi.ph' in syslog.ph line 74 which doesn't exist --
+  # seems to be a bug in h2ph)
+--- 978,984 ----
+  $BnP->begin_section("fox");
+  
+  $BnP->begin_section("net");
+! &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+  # &install_module('pRPC-modules-0.1005', 'authors/id/JWIED');
+  # (requires 'machine/ansi.ph' in syslog.ph line 74 which doesn't exist --
+  # seems to be a bug in h2ph)
+***************
+*** 997,1003 ****
+  $BnP->system("/bin/sh ../dist/configure");
+  $BnP->system("make");
+  $BnP->back(2);
+- $BnP->resume();
+  
+  $BnP->fetch('DB_File-1.60.tar.gz', 'authors/id/PMQS', $SourceDir);
+  $BnP->system("gunzip -c '$SourceDir/DB_File-1.60.tar.gz' | tar xf -");
+--- 1004,1009 ----
+***************
+*** 1009,1014 ****
+--- 1015,1021 ----
+  $BnP->system("make install UNINST=1");
+  &install_tree_manpages("DB_File-1.60");
+  $BnP->back();
++ $BnP->resume();
+  
+  $BnP->end_section("db");
+  
+***************
+*** 1018,1025 ****
+  
+  &install_module('MD5-1.7', 'authors/id/NWINT');
+  &install_module('SHA-1.2', 'authors/id/UWEH');
+! &install_module('Crypt-DES-1.0', 'authors/id/GARY');
+! &install_module('Crypt-IDEA-1.0', 'authors/id/GARY');
+  &install_module('PGP-0.3a', 'authors/id/GEHIC');
+  &install_module('PGP-Sign-0.09', 'authors/id/RRA');
+  $BnP->begin_section("fox");
+--- 1025,1032 ----
+  
+  &install_module('MD5-1.7', 'authors/id/NWINT');
+  &install_module('SHA-1.2', 'authors/id/UWEH');
+! #&install_module('Crypt-DES-1.0', 'authors/id/GARY');
+! #&install_module('Crypt-IDEA-1.0', 'authors/id/GARY');
+  &install_module('PGP-0.3a', 'authors/id/GEHIC');
+  &install_module('PGP-Sign-0.09', 'authors/id/RRA');
+  $BnP->begin_section("fox");
+***************
+*** 1167,1173 ****
+  $BnP->end_section("penguin");
+  
+  &install_module('RPC-Simple-0.5', 'authors/id/DDUMONT');
+! &install_module('Net-Pcap-0.01', 'authors/id/PLISTER'); # for FreeBSD2
+  
+  $BnP->end_section("net");
+  
+--- 1174,1180 ----
+  $BnP->end_section("penguin");
+  
+  &install_module('RPC-Simple-0.5', 'authors/id/DDUMONT');
+! #&install_module('Net-Pcap-0.01', 'authors/id/PLISTER'); # for FreeBSD2
+  
+  $BnP->end_section("net");
+  
+***************
+*** 1359,1370 ****
+  $BnP->fetch('Curses-1.02.tar.gz', 'authors/id/WPS', $SourceDir);
+  $BnP->system("gunzip -c '$SourceDir/Curses-1.02.tar.gz' | tar xf -");
+  $BnP->chdir("Curses-1.02");
+! $BnP->system("rm -f c-config.h; ln hints/c-freebsd.ncurses.h c-config.h");
+  #                                          ^^^^^^^
+  #                                          !!!!!!!
+  $BnP->patch("Makefile.PL",
+      's!my \$inc;!my \$inc = \"\";!',
+!     's!my \$libs;!my \$libs = \"-lncurses -ltermcap\";!');
+  $BnP->system("'$Perl' Makefile.PL");
+  $BnP->system("make");
+  $BnP->system("make install UNINST=1");
+--- 1366,1378 ----
+  $BnP->fetch('Curses-1.02.tar.gz', 'authors/id/WPS', $SourceDir);
+  $BnP->system("gunzip -c '$SourceDir/Curses-1.02.tar.gz' | tar xf -");
+  $BnP->chdir("Curses-1.02");
+! $BnP->system("rm -f c-config.h; ln hints/c-solaris.h c-config.h");
+  #                                          ^^^^^^^
+  #                                          !!!!!!!
+  $BnP->patch("Makefile.PL",
+      's!my \$inc;!my \$inc = \"\";!',
+!     's!my \$libs;!my \$libs = \"-lncurses\";!');
+! #   's!my \$libs;!my \$libs = \"-lncurses -ltermcap\";!');
+  $BnP->system("'$Perl' Makefile.PL");
+  $BnP->system("make");
+  $BnP->system("make install UNINST=1");
+***************
+*** 1415,1421 ****
+  &install_module('X11-Protocol-0.04', 'authors/id/SMCCAM');
+  $BnP->end_section("x11");
+  
+! $BnP->begin_section("tk","ptk","fox"); # Perl Tk
+  &install_module('Tk800.011', 'authors/id/NI-S');
+  &install_module('Tk-FileDialog-1.3', 'authors/id/BPOWERS');
+  &install_module('Tk-GBARR-1.03', 'authors/id/GBARR');
+--- 1423,1429 ----
+  &install_module('X11-Protocol-0.04', 'authors/id/SMCCAM');
+  $BnP->end_section("x11");
+  
+! $BnP->begin_lazy_section("tk","ptk","fox"); # Perl Tk
+  &install_module('Tk800.011', 'authors/id/NI-S');
+  &install_module('Tk-FileDialog-1.3', 'authors/id/BPOWERS');
+  &install_module('Tk-GBARR-1.03', 'authors/id/GBARR');
+***************
+*** 1426,1432 ****
+  &install_module('Tk-WaitBox-1.2', 'authors/id/BPOWERS');
+  &install_module('Tk-Multi-0.71', 'authors/id/DDUMONT');
+  &install_module('Tk-HTML-3.002', 'authors/id/NI-S');
+! $BnP->end_section("tk","ptk","fox");
+  
+  $BnP->end_section("gui");
+  
+--- 1434,1440 ----
+  &install_module('Tk-WaitBox-1.2', 'authors/id/BPOWERS');
+  &install_module('Tk-Multi-0.71', 'authors/id/DDUMONT');
+  &install_module('Tk-HTML-3.002', 'authors/id/NI-S');
+! $BnP->end_lazy_section("tk","ptk","fox");
+  
+  $BnP->end_section("gui");
+  

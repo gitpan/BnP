@@ -1,0 +1,1136 @@
+
+=head1 NAME
+
+genopt - B<GEN>erate access layer for B<OPT>ional software
+
+=head1 SYNOPSIS
+
+  genopt
+    [-c]           -  create the target installation subtree
+    [-f]           -  force override of foreign conflicting links
+    [-r]           -  remove all links to target in selected subdirs
+    [-p <path>]    -  the prefix of the installation hierarchy
+    [-s <path>]    -  the software package installation subtree
+    [-d <dirlist]  -  comma separated list of subdirs to act on
+    <target>       -  the software package's directory to act on
+
+  genopt [-h]      -  print help screen and exit
+
+  genopt -v        -  print version information and exit
+
+=head1 ABSTRACT
+
+Did you ever hate the common software installation practice where all the
+binaries get installed into the same place (such as "/usr/local/bin",
+for instance), trampling over one another, and other files getting copied
+all over your file system, thus making the de-installation of a package
+extremely difficult (which files belong to this package and which don't,
+and where are they?!)?
+
+Did you ever want to maintain a clean and well-organized installation
+directory structure instead, in which every software package is installed
+in a separate directory subtree of its own, allowing the (dynamic) grouping
+of related software packages into categories (i.e., common subdirectories)
+and the easy de-installation without any residues?
+
+"genopt" is a tool for administrating the installation of a great number
+of software packages on Unix systems in a very transparent way with minimal
+effort. The de-installation of software packages is also enormously simplified.
+
+The files belonging to any given application (such as binaries, manual pages,
+libraries and so on) are all stored together in a distinct directory subtree.
+
+There are pivotal directories for binaries, manual pages etc. that you
+need to include in your search path in order to access the applications
+administrated with "genopt".
+
+The central idea of "genopt" is that these pivotal directories contain
+symbolic links which point to the various application's files.
+
+"genopt" administrates these symbolic links.
+
+A definition of "genopt" (by its original author Ralf S. Engelschall) says:
+
+    `` _Gen_eration of a compact central access layer
+       for a large pool of locally installed
+       _opt_ional Unix software,
+       distributed with complete sources ''
+
+=head1 PREFACE
+
+There are many methods to deal with the problem of software installation.
+They all have various advantages and shortcomings. Some of the most common
+practices will be presented here shortly as an introduction into the matter:
+
+=over 2
+
+=item *
+
+copy & stay forever
+
+This is the common practice on PC's under DOS/Windows. New software packages
+are copied to the machine in question and dispersed all over the file system
+in such a way that after some time hardly anybody knows which files (or lines
+in an "*.ini" file) belong to which application.
+
+As a consequence, almost never a software package is de-installed completely.
+
+In the meantime tools have emerged to handle this problem ("un-installer"),
+but even these tools cannot always prevent problems which may arise when
+de-installing the various components of an application, especially such
+as the libraries shared between many applications (DLL's).
+
+This method of installation is completely unacceptable on Unix systems
+where the number and complexity of the installed software packages is
+typically much higher, especially on application servers for many users
+at the same time, which usually show a large fluctuation of the installed
+software packages due to changes in user demand, upgrades and the testing
+of new products.
+
+Conclusion:
+
+  installation    : simple
+  de-installation : almost impossible!!
+
+=item *
+
+package installation (e.g. Solaris etc.)
+
+On some systems some (proprietary) mechanisms have been especially implemented
+to address the issue of software installation and de-installation (for instance
+on System V-derivatives). However, they all require a number of special files
+for each and every software package that is to be installed and/or de-installed
+in this way, files which usually do not accompany the software packages as they
+are commonly found (on the Internet, for instance), except for software
+packages provided by the operating system vendor himself, maybe.
+Creating these files yourself can easily cost up to a week of work, if
+you can succeed at all despite the frequently insufficient documentation
+of these installation mechanisms.
+
+Conclusion:
+
+  installation    : sometimes very simple
+  de-installation : sometimes very simple
+
+=item *
+
+"/usr/local/dist"-solution (e.g. Technical University of Munich, Germany)
+
+With this method each application is stored in a separate directory subtree
+of its own. The directory "/usr/local/dist" thereby contains a large number
+of symbolic links, each pointing to one of the installed applications.
+However, these links have to be created manually because there is no tool
+available for automating this task. In practice this leads to a situation
+in which some of the applications are installed in this way, others not, thus
+seriously corrupting transparency. Thus the installation using this method
+is hard, because it is labour-intensive, and the de-installation is also hard,
+because one needs to know exactly which links need to be removed.
+
+Conclusion:
+
+  installation    : hard
+  de-installation : hard
+
+=item *
+
+GenOpt
+
+An installation with "genopt" resembles the "/usr/local/dist"-method:
+software packages are stored in separate directory subtrees, and some
+central directories contain symbolic links to the various applications.
+
+However, the symbolic links are administrated automatically by "genopt",
+and need not to be created and removed manually. Moreover, "genopt" also
+creates the necessary directory structures when needed.
+
+In a way this is like the "package installation" method mentioned above,
+but without the need for special per-package installation- and de-installation
+scripts.
+
+A necessary prerequisite is that the application in question is configurable
+and does not contain any hard-coded paths. In the most favourable circumstances,
+the application will be available in source code form which can be adapted as
+needed.
+
+Conclusion:
+
+  installation    : easy
+  de-installation : easy
+
+=back
+
+=head1 CONTENTS
+
+    1. GenOpt
+    1.1 What does it look like what GenOpt creates?
+    1.2  How to install software with GenOpt
+    1.2.1 Preparing the installation
+    1.2.2 Unpacking the software
+    1.2.3 Necessary adjustments to the software
+    1.2.4 Linking the package with GenOpt
+    1.2.5 How to relocate a software package
+    1.2.6 How to de-install a software package
+    1.3 General usage instructions
+    2. Summary by original author Ralf S. Engelschall
+    3. Tips & Tricks
+
+=head1 DESCRIPTION
+
+=head2 1. GenOpt
+
+"genopt" consists of a Bourne shell script with a length of roughly 40 KB.
+
+Besides the built-in Bourne shell commands, only standard Unix tools such
+as cat, ls, sed, awk etc. are used throughout this script, because "genopt"
+is intended to be useable already when installing a Unix machine for the
+first time (bootstrapping!).
+
+=head2 1.1 What does it look like what GenOpt creates?
+
+"genopt" creates an access layer or "access interface" at a freely chosen
+point in your file system to give you access to the installed software
+packages. Usually this point is "/opt", but any other directory will do.
+
+"genopt" can be configured (configuration constant "DEFAULT_LOGICAL_ROOT"
+at the beginning of the script) or instructed via command line options to
+use any prefix you wish.
+
+One of the reasons for the necessity of this access layer is that you can't
+possibly include all the different directories from your various applications
+containing executables into your search path (i.e., the environment variable
+"$PATH").
+
+This access layer (e.g. "/opt") is organized as follows:
+
+  Access via...    link in access layer...  giving access to...
+  ---------------- ------------------------ -----------------------------
+                    /opt/pkg/foo-591        foo-591 is a directory link
+                                            giving access to all files of
+                                            example application foo-591
+
+  $PATH             /opt/bin/foo            executables of application
+                         .../bar
+
+  $MANPATH          /opt/man/man1/foo.1     application's manual pages
+                         .../man8/bar.8     (nroff-format)
+
+  $INFOPATH         /opt/info/foo.info      application's documentation
+                          .../foo-1.info    (GNU texinfo-format)
+
+                    /opt/lib/foo-591        directory link to the "lib"-
+                                            subdirectory of the applica-
+                                            tion, destined to all files
+                                            the application needs inter-
+                                            nally, e.g. foo.cfg, foo.hlp,
+                                            local binaries etc. The app-
+                                            lication has been configured
+                                            before the installation to
+                                            seek these files here.
+
+  cc -I             /opt/include/foo.h      C header files
+
+  cc -L, ldconfig   /opt/shlib/libfoo.a     static und runtime (dynamic)
+                           .../libfoo.so.2  shared-libraries
+
+  $XAPPLRESDIR      /opt/xad/Foo            X11 application defaults
+                         .../Bar
+
+The files in "/opt/shlib" are accessed at runtime by the kernel, the files
+in "/opt/xad" are accessed by X11 applications via the "libX11" library,
+and so on.
+
+An illustration should make this structure clearer:
+
+                                      /opt/
+                                        |
+      +---------+----+----+------+------+-----+----+-----+------+-----+
+      |         |    |    |      |      |     |    |     |      |     |
+  packages     pkg  bin  etc  include  info  lib  man  shlib  texmf  xad
+      |         |    |    |      |      |     |    |     |      |     |
+  ... : ...     |    |    |  symbolic link access layer  |      |     |
+      |         |    |    |      |      |     |    |     |      |     |
+   foo-591 <----+    v    v      v      v     v    v     v      v     v
+      |
+      |  dist  arc  bin  etc  include  info  lib  man  shlib  texmf  xad
+      |   |     |    |    |      |      |     |    |     |      |     |
+      +---+-----+----+----+------+------+-----+----+-----+------+-----+
+         software package's individual physical installation subtree
+
+The software packages can thereby be contained in the (global) physical
+installation subtree (usually "/opt/packages") either in a flat way,
+as follows:
+
+                                /opt/packages/
+                                      |
+   +----+-----+------+----+-----+-----+------+------+----+-----+-- ...
+   |    |     |      |    |     |     |      |      |    |     |
+  perl elm sendmail vim rdist baybox gzip sattrack tin shutil cvs  ...
+
+Or they can be grouped together into categories and subcategories of your
+own free choice, as in the following example:
+
+                            /opt/packages/
+                                  |
+          +----------------+------+-------+----------------+-- ...
+          |                |              |                |
+       network          utility        develop          hamradio
+          |                |              |                |
+   +------+-----+      +---+---+     +----+----+      +----+----+
+   |      |     |      |       |     |    |    |      |         |
+  Mail  News  rdist  shutil  gzip  perl  cvs  vim  sattrack  baybox
+   |      |
+   |     tin
+   |
+   +------+
+   |      |
+  elm  sendmail
+
+Note that this structure should not be altered manually (exceptions to this
+rule see further below) if you don't want to risk loosing the access to your
+applications.
+
+Regard it as something internal not to be tampered with just like the data
+files of a database system.
+
+(Some operations, like creating new categories and relocating already
+installed software packages, are permitted under certain conditions.)
+
+Additionally, "genopt" creates some files in the access layer's root directory
+("/opt") for its own internal housekeeping. These files are named ".genopt.L.*"
+and may not be touched, just like the index files of a database system.
+
+Finally, "genopt" also writes a log file into that same directory named
+".genopt.errors", which you actually may need to trim (manually) from
+time to time.
+
+=head2 1.2  How to install software with GenOpt
+
+Software packages are best installed each in a completely separate directory
+subtree of their own, which are located in a dedicated software package
+installation hierarchy, grouped together in categories and subcategories
+(i.e., subdirectories and subsubdirectories) according to their function.
+
+This installation hierarchy must be a subdirectory of the root directory
+of the symbolic link access layer ("/opt"), the name (or path) of which
+is freely configurable, as long as it does not conflict with any of the
+reserved subdirectory names already used by "genopt".
+
+This subdirectory is usually called "packages" (or "PKG", on some machines),
+which is the current default.
+
+You can choose a different directory name or path by either changing the
+corresponding configuration constant "DEFAULT_PHYSICAL_ROOT" at the beginning
+of "genopt", or by specifying a different value via the "C<-s>" command line
+option.
+
+The following discussion assumes an application named "foo-591" being
+installed into the directory "/opt/packages/misc/foo-591".
+
+=head2 1.2.1 Preparing the installation
+
+First of all the subdirectory tree for accommodating the new software package
+has to be created.
+
+This is best and most easily done using "genopt" itself:
+
+      % genopt -c /opt/packages/misc/foo-591
+
+Alternatively, you could also use (provided that the directory
+"/opt/packages/misc" already exists):
+
+      % cd /opt/packages/misc
+      % genopt -c foo-591
+
+(The option "C<-c>" means "create".)
+
+This call of "genopt" creates the following directories:
+
+      /opt                               (only if still non-existent)
+      /opt/packages                      (only if still non-existent)
+      /opt/packages/misc                 (only if still non-existent)
+      /opt/packages/misc/foo-591
+      /opt/packages/misc/foo-591/arc
+      /opt/packages/misc/foo-591/bin
+      /opt/packages/misc/foo-591/etc
+      /opt/packages/misc/foo-591/include
+      /opt/packages/misc/foo-591/info
+      /opt/packages/misc/foo-591/lib
+      /opt/packages/misc/foo-591/man
+      /opt/packages/misc/foo-591/shlib
+      /opt/packages/misc/foo-591/texmf
+      /opt/packages/misc/foo-591/xad
+
+Note that you can specify in detail which of these subdirectories in the
+"foo-591" directory should actually be created by using the command line
+option "C<-d>" (for more on this, see further below).
+
+Additionally, "genopt" already creates the first symbolic links, the most
+important of which is:
+
+      /opt/pkg/foo-591 -> /opt/packages/misc/foo-591
+
+(More on this link see below.)
+
+Here's a more detailed explanation of the most important of these
+subdirectories (the minimal configuration):
+
+=over 2
+
+=item *
+
+/opt/packages/misc/foo-591
+
+This directory will contain ALL the files belonging to the new application,
+thus ensuring that the application can be de-installed easily, by simply
+deleting this directory (and removing any symbolic links pointing to it).
+
+=item *
+
+/opt/packages/misc/foo-591/arc
+
+This subdirectory is indispensable, because "genopt" will only create
+the most important link (the one from "/opt/pkg/foo-591" pointing to
+"/opt/packages/misc/foo-591") if this subdirectory exists.
+
+(This is also a protective measure in order to prevent you from accidentally
+creating links to a directory which is not an application's installation
+directory.)
+
+This directory is intended for archiving (hence its name) the original
+source distribution file of the software package in question for possible
+later reference.
+
+Moreover, it has proven to be good practice to safeguard any configuration
+files here for later re-use which you may have altered to suit your system.
+
+=item *
+
+/opt/packages/misc/foo-591/bin
+
+This subdirectory will contain all the executables which belong to the
+new application (stored here by "make install").
+
+=back
+
+=head2 1.2.2 Unpacking the software
+
+First, change directory to the application's installation directory which
+has been created in the previous step (see subsection above):
+
+      % cd /opt/packages/misc/foo-591
+
+Put the application's source distribution file into the "arc" subdirectory
+and then unpack it, as follows:
+
+      % gunzip -c arc/foo-591.tar.gz | tar xf -
+
+If this pipe doesn't work on your system for some reason, proceed as follows:
+
+      % cp arc/foo-591.tar.gz .
+      % gunzip foo-591.tar.gz
+      % tar xf foo-591.tar
+      % rm -f foo-591.tar
+
+Beware that some misbehaving packages do not create a new subdirectory
+"foo-591" when unpacked in this way; they sometimes simply spill their
+contents into whatever the current working directory is.
+
+If in doubt, first test the distribution file with "tar tf". If all
+filenames shown begin with "foo-591/..." then proceed as described above.
+
+Otherwise create a new subdirectory named "dist" (or whatever you like,
+as long as the name doesn't conflict with the subdirectory names reserved
+by "genopt"), change directory to it and unpack the distribution there.
+
+It may be a good idea to use such a directory in all cases, just to be
+sure and to avoid the need for the extra check.
+
+=head2 1.2.3 Necessary adjustments to the software
+
+This step is manual work, but substantially less hassle than creating the
+special files needed for "package installation" mechanisms (as described in
+the preface at the top of this document), for instance.
+
+The symbolic link
+
+      /opt/pkg/foo-591 -> /opt/packages/misc/foo-591
+
+is of utmost importance here, because it allows to hide the physical path
+to the installation directory of the application from the application itself.
+
+This is absolutely essential in order to be able to relocate this application
+later, which may be desirable to do if you want to re-organize your categories
+into which you have grouped your software packages, for instance if a category
+grows too large and needs further refinement.
+
+An application with the path "/opt/packages/misc/foo-591" hard-coded into it
+would simply not work anymore after such a relocation.
+
+Therefore it is important that the application does not know about its own
+physical location, and that it accesses all of its own files via the symbolic
+link "/opt/pkg/foo-591".
+
+Thus, before being able to proceed with the compilation of your application,
+you need to configure it appropriately.
+
+Many software packages provide some configuration utility for this purpose.
+
+Please refer to the installation instructions of your package to find out
+how to change the installation prefix.
+
+Usually, you just need to say:
+
+      % ./configure --prefix=/opt/pkg/foo-591
+
+and you're done.
+
+For some packages (like Perl, for instance) you have to use
+
+      % ./Configure -Dprefix=/opt/pkg/foo-591
+
+instead.
+
+If such an automatic configuration tool is not available in your package,
+you may have to edit the application's "Makefile" or its sources in order
+to configure it properly.
+
+Be sure to configure it as follows, so that all hard-coded paths will take
+a route via some symbolic link:
+
+      /opt/pkg/foo-591           general base for all other paths
+
+      /opt/pkg/foo-591/bin       for all user-executable binaries
+
+      /opt/pkg/foo-591/lib       (or more elegantly)
+      /opt/lib/foo-591           for all libraries and binaries used
+                                 exclusively by the application itself
+
+      /opt/pkg/foo-591/man/man1  for all manual pages
+      /opt/pkg/foo-591/man/man3
+      /opt/pkg/foo-591/man/....
+
+      /opt/pkg/foo-591/etc       for "rc" ("run-configure") files
+      /opt/pkg/foo-591/include   for C header files ("*.h")
+      /opt/pkg/foo-591/info      for GNU info files (documentation)
+      /opt/pkg/foo-591/shlib     for all shared libraries
+      /opt/pkg/foo-591/texmf     for all TeX resources
+      /opt/pkg/foo-591/xad       for all X resources
+
+Make sure that the directory "/opt/pkg/foo-591/bin" will only contain those
+executables which are meant to be called by the user of the application.
+
+All binaries which the application needs for internal purposes only should
+go into the directory "/opt/pkg/foo-591/lib".
+
+(Note that "/opt/lib/foo-591" is just a convenient shorthand for
+"/opt/pkg/foo-591/lib", but via a different symbolic link.)
+
+Finally, build your application (usually by saying "make" or "make all" -
+refer to the installation instructions of your package for more details).
+
+=head2 1.2.4 Linking the package with GenOpt
+
+After successfully compiling the new application, install it into its
+destination subdirectories (usually with "make install", but refer to
+the installation instructions of your package to be sure).
+
+If the application has been configured correctly in the previous step,
+this will automatically install the necessary files into the appropriate
+subdirectories, i.e., "/opt/pkg/foo-591/bin", "/opt/lib/foo-591",
+"/opt/pkg/foo-591/man", and so on.
+
+Note that with some (especially very small) applications you may need to
+manually copy or move these files to their final destinations.
+
+After that the application still needs to be made accessible by creating
+the corresponding symbolic links.
+
+This is accomplished with the following simple commands:
+
+      % cd /opt/packages/misc/foo-591
+      % genopt .
+
+Or alternatively:
+
+      % genopt /opt/packages/misc/foo-591
+
+Or also:
+
+      % genopt /opt/pkg/foo-591
+
+Note that you can use this same command when you install more files later,
+for example when you install Perl modules later you should run the command
+
+      % genopt -d man /opt/pkg/perl5.005_02
+
+(or whatever the name of the directory of your Perl installation is) afterwards
+in order to create the necessary links to the manual pages belonging to the new
+module(s).
+
+(The option "C<-d man>" thereby restricts the action of "genopt" to the "man"
+subdirectory tree, i.e., "man/man1", "man/man3" and so on.)
+
+These commands cause "genopt" to scan the subdirectories of the
+application's installation directory (i.e., the subdirectories of
+"/opt/packages/misc/foo-591") and to create a symbolic link in the
+corresponding subdirectory of the access layer root directory ("/opt")
+for each eligible file it finds during this scan, for example:
+
+      /opt/bin/bar -> ../packages/misc/foo-591/bin/bar
+
+("Eligible" means that the files must be readable and non-empty. Additionally,
+binaries are required to have the "executable" bit set.)
+
+This is true for all subdirectories except "lib" and "texmf", where no
+links to individual files are created but rather a directory link pointing
+to the subdirectory itself, i.e.,
+
+      /opt/lib/foo-591    ->  ../packages/misc/foo-591/lib
+      /opt/texmf/foo-591  ->  ../packages/misc/foo-591/texmf
+
+Remember that the symbolic link in "/opt/pkg" is also a directory link:
+
+      /opt/pkg/foo-591    ->  ../packages/misc/foo-591
+
+Note also that "genopt" actually creates RELATIVE links (as shown here
+above), and not ABSOLUTE links (as was shown in the examples further
+above for better clarity), i.e., it always creates links pointing to
+"../packages/misc/foo-591/..." and not "/opt/packages/misc/foo-591/...".
+
+This makes it possible to relocate the ENTIRE "genopt" installation
+hierarchy later to a different place in your file system, as in the
+following example, with all links intact and working:
+
+      % cd /
+      % mv opt /usr/local/
+
+Instead of accessing your binary "bar" with "/opt/bin/bar", you now would
+say "/usr/local/opt/bin/bar".
+
+In order not to break existing shell scripts (for instance) which use the
+absolute path "/opt/bin/bar", it is advisable however to additionally create
+a symbolic link for backwards compatibility, as follows:
+
+      % cd /
+      % ln -s /usr/local/opt opt
+
+Finally, remember to include the following directories in the following
+environment variables, if you haven't done so already:
+
+      % PATH="/opt/bin:$PATH"; export PATH
+      % MANPATH="/opt/man:$MANPATH"; export MANPATH
+      % INFOPATH="/opt/info:$INFOPATH"; export INFOPATH
+      % XAPPLRESDIR="/opt/xad:$XAPPLRESDIR"; export XAPPLRESDIR
+
+You should also put these statements into the profile of your preferred shell
+(e.g. "$HOME/.bashrc") or into the global profile for all users on your system
+(usually in "/etc/profile").
+
+Moreover, configure "ldconfig" to include the directory "/opt/shlib" in its
+path (see L<ldconfig(8)> for details).
+
+=head2 1.2.5 How to relocate a software package
+
+Relocating a software package (for example when a category has grown too
+large and you want to subdivide it) implies the following three steps:
+
+In the first step, you need to "cut" all connections (i.e., links) to the
+application in question:
+
+        % cd /opt/packages/misc/foo-591
+        % genopt -r .
+
+(The option "C<-r>" means "remove".)
+
+In the second step, the application is moved as desired, for example:
+
+        % cd /opt/packages
+        % mkdir tools
+        % mkdir tools/filter
+        % mv misc/foo-591 /opt/packages/tools/filter/
+
+In the third and last step, the application is "linked" anew:
+
+        % cd tools/filter/foo-591
+        % genopt .
+
+Done!
+
+Note that these three steps are also required if you just want to rename
+the installation directory of an application ("foo-591" in this example).
+
+The need for renaming an installation directory may arise for example when
+you first installed some software package into an installation directory whose
+name does not include any version number, and later you want to install a
+newer version of that same package, but without removing the older version
+(as a fallback measure, for instance, in case the newer version proves to
+be defective, or to be able to access both applications during a transition
+period).
+
+In such a case you should rename the installation directory of the older
+version in such a way as to include its version number in the name (for
+example, "mv perl perl5.004_04") and then install the new version (either
+(again) into a (new) installation directory named "perl" or (better) into
+a directory whose name also includes the version number (say, "perl5.005_02").
+
+=head2 1.2.6 How to de-install a software package
+
+The de-installation of a software package is extremely simple:
+
+        % cd /opt/packages/tools/filter/foo-591
+        % genopt -r .
+        % cd ..
+        % rm -rf foo-591
+
+That's all!
+
+Alternatively you can also use:
+
+        % cd /opt/packages/tools/filter/foo-591
+        % rm -rf *
+        % genopt .
+        % cd ..
+        % rmdir foo-591
+
+(Note that in this latter case you don't need to specify the "C<-r>" option.
+However it causes no harm if you do.)
+
+This method has one advantage and two disadvantages compared with the first
+method above:
+
+First of all, this latter method needs one step more than the first method
+above.
+
+Second, this method is a little faster, but it does not always find all the
+links it should remove (in cases when there are inconsistencies between the
+index files of "genopt" and the links that actually exist in the file system).
+
+Therefore it is safer (but a little slower) to use "genopt" with the "C<-r>"
+option on an intact installation directory.
+
+=head2 1.3 General usage instructions
+
+=over 2
+
+=item -
+
+If you call "genopt" without parameters or with the parameter "C<-h>" (for
+"help"), "genopt" prints a help screen and exits (with return code "1").
+
+Note that the "C<-h>" option overrides all others which may or may not be
+present on the same command line.
+
+This help screen is a quick reference guide which lists the available options
+and briefly describes their function.
+
+=item -
+
+If you call "genopt" with the option "C<-v>" (for "version" - not "verbose"),
+"genopt" prints a line with its current version information and exits (with
+return code "1").
+
+(See further below for how to influence the verbosity of this script.)
+
+Note that the "C<-v>" option overrides all others options, including the
+"C<-h>" option.
+
+=item -
+
+If you accidentally or frivolously changed some of the links or index files
+administrated by "genopt", it usually suffices to run "genopt" again for
+the affected application(s) in order to restitute the link(s) and/or to
+resolve any inconsistencies in the index files of "genopt".
+
+In some cases you might have to use the "C<-f>" ("force") option, though
+(see below).
+
+Moreover, if you delete links manually, dead weight will accumulate in the
+index files, which will eventually slow down "genopt".
+
+Note that the automatic restitution works only partially if you enable the
+"fast mode" (see also below).
+
+=item -
+
+Should the automatic restitution not work as desired, you may also delete
+(or move to a save place, as a backup measure) all the subdirectories and
+files in the "/opt" directory EXCEPT the subdirectory "packages".
+
+Then use the tool "mgenopt" ("multi-genopt") from the "misc" subdirectory
+in this distribution for a recursive descent into your "/opt/packages" tree,
+thereby automatically calling "genopt" for each application found.
+
+Note that you need to change the configuration in "mgenopt" if your hierarchy
+is not located in "/opt" or if your physical installation area is not in the
+subdirectory "packages".
+
+Any parameters given to "mgenopt" are simply passed through transparently
+to "genopt" (this may be useful for using the "C<-f>" ("force") option,
+for instance).
+
+=item -
+
+Sometimes two applications have files with the same name, especially if you
+have two different versions of the same application installed in parallel.
+
+This may give rise to conflicts in the symbolic link access layer, since
+both applications will want to create a link to their own file.
+
+"genopt" will usually report a warning message ("C<[CONFLICT]>") in such
+cases but will leave any conflicting links untouched.
+
+This will prevent "genopt" from creating or removing a link as requested.
+
+However, if you want to explicitly give preference to one of the conflicting
+applications, you can do so by running "genopt" for that application again,
+but this time with the "C<-f>" ("force") option.
+
+This will cause all conflicting links from the other application (or version)
+to be overridden, i.e., to be removed, allowing "genopt" to subsequently
+create the requested links.
+
+For better visual control, "genopt" always displays the conflicting link
+on the terminal, not the link which should have been created or the one
+"genopt" was expecting to remove.
+
+In the log file written by "genopt" (see also further below), however, this
+logic is slightly different: There the link which should have been created
+or the link which would have been removed is displayed, and the reason why
+this could not be done is given in parentheses behind that.
+
+=item -
+
+Please note that the automatic detection of conflicts and the automatic
+restitution of links (along with the automatic repair of the associated
+index files) only works partially when the "fast mode" is enabled (see
+also the configuration constant "fast_mode" and its explanation in the
+"configuration constants" section of the script).
+
+In order to be absolutely sure that all inconsistencies or conflicts have been
+found, one should first remove all the links to the application in question
+using the option "C<-r>" ("remove"), and then re-create all links by calling
+"genopt" again (no special option required this time).
+
+However, this would cost you more than the speed gained through the "fast
+mode" in the first place.
+
+So either do not use the "fast mode", or make sure that nobody can mess around
+with the links and index files maintained by "genopt".
+
+(Or disable the "fast mode" temporarily to perform any repairs.)
+
+Note also that the "fast mode" only speeds up the verification of symbolic
+links, the creation and removal of links remains completely unaffected.
+
+(In "fast mode", "genopt" blindly "trusts" its own index files and does not
+verify the file system, as in the standard mode.)
+
+=item -
+
+Note that you can use the parameter "C<-d>" ("d" for "directory") to restrict
+the actions of "genopt" to certain of its predefined subdirectories.
+
+The default is to act on ALL predefined subdirectories (call "genopt" without
+parameters or with the option "C<-h>" to get a complete list).
+
+These subdirectories must be given as a comma separated list without any
+intervening whitespace (whitespace between the option letter and its argument
+is optional, however).
+
+That way you can create (when using the option "C<-c>") only those
+subdirectories your application really needs, thus preventing "genopt" from
+creating unneeded subdirectories which you have to delete manually afterwards
+(unless these empty directories do not bother you).
+
+That way you can also add more links later more easily and speedily when you
+install more parts (e.g. modules or plug-ins) of your application later, for
+example by restricting "genopt" to the "bin" subdirectory.
+
+This can also be a safety measure whenever you are using the "C<-f>" ("force")
+option, or to remove the links of just one particular subdirectory.
+
+Note that the option "C<-c>" (create the directory subtree for a new
+application) presents the following special cases in combination with
+the "C<-d>" option:
+
+  -  The subdirectories "arc" and "bin" constitute the minimal
+     configuration. They are ALWAYS created, regardless wether
+     they were explicitly specified or not.
+
+  -  The links in subdirectories which contain directory links
+     instead of individual file links are already created
+     at this time (if these subdirectories have been specified).
+
+     (Currently these directories are "pkg", "lib" and "texmf".)
+
+  -  The link from "pkg" to the application's base directory
+     is always created, regardless wether this subdirectory
+     was specified or not.
+
+(See the section "Tips & Tricks" below if you don't want any links
+to be created yet at this time.)
+
+Note also that you can have multiple occurrences of this option on the same
+command line, all arguments of these options will simply be accumulated
+internally to form the internal list of subdirectories to be processed.
+
+Therefore the following commands are all equivalent:
+
+        % genopt -d bin -d include -d lib -d man .
+
+        % genopt -d bin,man -d lib -dinclude .
+
+        % genopt -d bin,include,lib,man .
+
+=item -
+
+Note that whitespace is optional between option letters (of options which
+take an argument) and their argument (these options are currently "C<-p>",
+"C<-s>" and "C<-d>").
+
+=item -
+
+The condensation of several option letters into a single option string is
+NOT possible (i.e., an option string such as "C<-cdbin>" is illegal and
+will cause an error message with program abortion).
+
+=item -
+
+The use of the link "/opt/lib/foo-591" instead of "/opt/pkg/foo-591/lib"
+is a matter of taste.
+
+Sometimes it is very hard to persuade a given application to use the former
+(for example in packages using GNU "configure" scripts).
+
+The link "/opt/lib/foo-591" can be considered more elegant (at least it
+is shorter than "/opt/pkg/foo-591/lib"), but both work equally well.
+
+Conclusion: If it is easy to achieve, use "/opt/lib/foo-591", if not,
+use "/opt/pkg/foo-591/lib" instead (for example by saying
+"./configure --prefix=/opt/pkg/foo-591").
+
+=item -
+
+It should not be concealed that although "genopt" is a very powerful, elegant
+and flexible tool for software installations under Unix, it does not cover
+all possible situations.
+
+This mainly concerns heterogeneous clusters of workstations who share their
+software installations via NFS (Network File System).
+
+"genopt" does not provide any support for multi-platform or multi-architecture
+installations within the same "genopt" installation hierarchy.
+
+(But you can of course create distinct hierarchies on the same central server
+if you want.)
+
+=item -
+
+Moreover, it is not possible to have different entries in the same directories
+for different (but otherwise compatible) machines, as in the following example:
+
+The "genopt" hierarchy is physically located on the machine "sunfi1".
+
+Among others, it contains the package "/opt/pkg/sendmail", the universal
+Unix program for sending and receiving mail.
+
+This package uses configuration files which are located in "/opt/lib/sendmail".
+
+The machine "sunfi2", which is binary compatible with machine "sunfi1",
+mounts and uses this same "genopt" hierarchy via NFS.
+
+The problem in this situation is that this machine may not be allowed to send
+and receive mail, although it can execute the program "/opt/bin/sendmail",
+because the configuration files (which specify the hostname, for instance)
+are only valid for machine "sunfi1".
+
+In order to solve this problem, "genopt" would need to generate
+TWO "/opt" hierarchies, departing from two different directories,
+"/opt/pkg/sendmail/lib.sunfi1" and "/opt/pkg/sendmail/lib.sunfi2"
+(from a common installation area "/opt/packages"): One for machine
+"sunfi1" (which would get the directory "/opt/pkg/sendmail/lib.sunfi1"
+as "/opt/lib/sendmail") and another for machine "sunfi2" (which would
+get the directory "/opt/pkg/sendmail/lib.sunfi2" also as "/opt/lib/sendmail").
+
+However, this is not possible with the current or any previous version of
+"genopt".
+
+=item -
+
+The subdirectories which "genopt" knows about and processes are
+configured at a single, easily accessible location in the script.
+
+Therefore, it is very easy to add more subdirectories should the need
+arise.
+
+Simply add them to the list in the configuration constant "COMMON_SUBDIRS".
+
+Moreover, if you want these subdirectories to contain directory links (just
+like "pkg", "lib" and "texmf", currently) instead of individual file links
+(which is the default), additionally add them to the list in the configuration
+constant "BRIDGE_SUBDIRS".
+
+=item -
+
+The subdirectories in "/opt/man" (such as "/opt/man/man1" and so on)
+are created automatically on demand.
+
+However they are not removed automatically when they become empty.
+
+=item -
+
+"genopt" writes a log file called ".genopt.errors" located in directory
+"/opt".
+
+Since "genopt" always appends to this file, you may need to trim it from
+time to time (note that the "build" command trims this file every time it
+is called).
+
+If you want more detailed information in this log file, set the configuration
+constant "details" in the script accordingly.
+
+=item -
+
+If you want to switch off the output sent to STDOUT by "genopt", set the
+configuration constant "verbose" in the script to an empty string.
+
+=item -
+
+This document describes "genopt" version 2.1.0, which differs considerably
+from previous versions since it is a complete rewrite, written by Steffen
+Beyer.
+
+=back
+
+=head2 2. Summary by original author Ralf S. Engelschall
+
+"genopt" has been used intensively for about six years now, especially at
+sd&m (software design & management GmbH & Co. KG, with head office in Munich,
+Germany), since the very first hours of its existence.
+
+"genopt" has ever since been used to administrate this company's Unix servers,
+and has also been used at the Technical University of Munich, and lately has
+begun to be used at the company "Zeppelin" (yes, the famous one! This company
+still exists but nowadays specializes in building machines).
+
+In all these places "genopt" has proven to be an extremely useful tool for
+the installation of optional Unix software, because:
+
+=over 2
+
+=item -
+
+"genopt" makes it possible to maintain the control and overview over
+a large pool of applications, while the administration itself is taken
+care of automatically by this tool,
+
+=item -
+
+because the de-installation of an application has become a trivial task:
+
+        % cd /opt/packages/misc/foo-591
+        % genopt -r .
+        % cd ..
+        % rm -rf foo-591
+
+=item -
+
+and because the installation with "genopt" is fun; as an administrator one
+does not need to worry so much about the technicalities of installing and
+de-installing the software anymore, one can concentrate on creating a
+hierarchy of categories which gives a maximum of clarity and overview.
+
+=back
+
+Summing up I have to say that six years of using "genopt" for the installation
+of Unix software has yielded excellent results.
+
+Only "genopt" made it possible at all to administrate such a huge number of
+applications (almost a thousand binaries!) successfully as in my case.
+
+=head2 3. Tips & Tricks
+
+=over 2
+
+=item *
+
+If you use the options "C<-c>" (for "create") and "C<-r>" (for "remove")
+simultaneously, only the requested subdirectories will be created,
+but no symbolic links whatsoever.
+
+=item *
+
+There is a shortcut for relocating a software package, as demonstrated in
+the example below (based on the example in the section "How to relocate a
+software package" above):
+
+        % cd /opt/packages
+        % mkdir tools
+        % mkdir tools/filter
+        % mv misc/foo-591 /opt/packages/tools/filter/
+        % cd tools/filter/foo-591
+        % genopt -f .
+
+In this way you don't need to "unlink" the application first before moving
+it around.
+
+BEWARE however that this shortcut does NOT work properly if you RENAME the
+installation directory of the application in question ("foo-591" in this
+example)!
+
+(The obsolete directory links referring to the old name of the installation
+directory will not be removed in such a case.)
+
+BEWARE also that you should use this shortcut ONLY if you are absolutely SURE
+that there are no other software packages with conflicting links you want to
+preserve, since the call "C<S<genopt -f .>>" above will overwrite any such
+links.
+
+=back
+
+=head1 SEE ALSO
+
+build(1), BnP(3).
+
+=head1 VERSION
+
+This man page documents "genopt" version 2.1.0.
+
+=head1 AUTHORS
+
+  Ralf S. Engelschall - original idea and first private versions
+
+  rse@engelschall.com
+  www.engelschall.com
+
+  Steffen Beyer       - complete rewrite and documentation
+                        (first public version)
+
+   sb@engelschall.com
+  www.engelschall.com/u/sb/download/
+
+=head1 COPYRIGHT
+
+  Copyright (c) 1992 - 1998 by Ralf S. Engelschall.
+  All rights reserved.
+
+  Copyright (c) 1998 by Steffen Beyer.
+  All rights reserved.
+
+=head1 LICENSE
+
+This package is free software; you can redistribute it and/or
+modify it under the same terms as Perl, i.e., under the terms
+of either the "Artistic License" or the "GNU General Public License".
+
+Please refer to the files "Artistic.txt" and "GNU_GPL.txt"
+in this distribution for details!
+
+=head1 DISCLAIMER
+
+This package is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+See the "GNU General Public License" for more details.
+

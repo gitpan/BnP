@@ -1,0 +1,604 @@
+     ____          _  _      _  _         _  ____   _
+    | __ )  _   _ (_)| |  __| |( ) _ __  ( )|  _ \ | |  __ _  _   _
+    |  _ \ | | | || || | / _` ||/ | '_ \ |/ | |_) || | / _` || | | |
+    | |_) || |_| || || || (_| |   | | | |   |  __/ | || (_| || |_| |
+    |____/  \__,_||_||_| \__,_|   |_| |_|   |_|    |_| \__,_| \__, |
+                                                              |___/
+
+
+      "Build'n'Play" ist ein Batch-Werkzeug fuer Administratoren,
+      die immer wieder die gleichen Software-Pakete auf diversen
+      Unix-Plattformen installieren muessen.
+
+      Als wichtigstes Feature bietet "Build'n'Play" dabei das
+      automatische Wiederaufsetzen an der Abbruchstelle nach
+      einem Fehler.
+
+      Hinweis: Bei der ersten Installation muessen die beiliegen-
+      den Installations-Skripte noch an einigen Stellen an das je-
+      weilige Betriebssystem angepasst werden; erwarten Sie daher
+      nicht, dass die Installation beim ersten Mal ohne Abbruch
+      glatt durchlaeuft.
+
+
+Systemvoraussetzungen:
+======================
+
+- Eine CD-ROM mit einem CPAN-Snapshot, oder eine Spiegelung des CPAN
+  auf Ihrer Festplatte, oder ein Server mit einer Spiegelung des CPAN
+  in Ihrem lokalen Netzwerk, oder eine funktionierende Internet-Verbindung
+  ("CPAN" = "Comprehensive Perl Archive Network").
+
+- Ausserdem eine Reihe von weiteren Quelldateien, die aber auf der CD-ROM
+  zu dem Buch "Programmieren mit Perl-Modulen" (O'Reilly Verlag 1999) bzw.
+  in der "fetten" Distribution von "Build'n'Play" (zu erkennen an dem Be-
+  standteil ".pkg." im Namen) schon enthalten sind.
+
+  Laden Sie dazu ggfs. mittels anonymous ftp die Datei "pkg.tar.gz" von
+  der Adresse "ftp://ftp.engelschall.com/pub/bnp/" herunter und entpacken
+  Sie sie _INNERHALB_ des Verzeichnisses, das beim Auspacken der "schlanken"
+  Distribution von "Build'n'Play" (ohne ".pkg." im Namen und ohne "src"-
+  Unterverzeichnis) entstanden ist.
+
+- Die Shell-Skripts "build" und "genopt" wurden auf FreeBSD 2.2.6, Linux
+  2.0.25 (SuSE), SunOS 4.1.3, Solaris 2.6 und HP-UX 10.01 erfolgreich ge-
+  testet und sollten auch auf anderen Unix-Derivaten problemlos laufen (es
+  liegen Bestaetigungen von Benutzern fuer DEC- und SGI-Unix (Irix) vor).
+
+  Da Perl auf noch wesentlich mehr Unix-Plattformen auf Anhieb kompiliert,
+  sollten alle anderen Teile von "Build'n'Play" (die in Perl geschrieben
+  sind) auch ueberall dort funktionieren.
+
+- Die Installation von Perl benoetigt auf der Festplatte maximal etwa 125 MB
+  temporaeren Speicher sowie zusaetzlich maximal etwa 50 MB Speicher fuer Perl
+  selbst und saemtliche in "perl.bnp" installierten Module (das schliesst etwa
+  10 MB fuer die HTML-Versionen von allen Manual Pages mit ein).
+
+  Diesen Zahlen liegt die Installation von CD-ROM zugrunde; bei der Instal-
+  lation ueber das Netz (d.h. ohne CD-ROM und ohne eine Spiegelung des CPAN
+  auf der Festplatte) kommt zusaetzlich noch der Platzbedarf fuer die Quell-
+  dateien selbst (von Perl und den installierten Modulen) von knapp 20 MB
+  hinzu.
+
+- Ein Pentium 133 mit FreeBSD 2.2.6 braucht etwa 3 Stunden, um Perl mit allen
+  Modulen zu installieren.
+
+- Die mitgelieferten Installations-Skripte "<target>.bnp" enthalten teilweise
+  noch Abhaengigkeiten vom Betriebssystem (ich selbst entwickle unter FreeBSD
+  2.2.6) und muessen ggfs. wie im folgenden beschrieben auf die Festplatte
+  kopiert und dann entsprechend angepasst werden.
+
+
+Installation:
+=============
+
+0) Rechner starten:
+
+   Starten Sie Ihren Unix-Rechner.
+
+>> Variante _MIT_ CD-ROM:
+   ----------------------
+
+1) CD-ROM einlegen:
+
+   Legen Sie die CD-ROM zum Buch "Programmieren mit Perl-Modulen" des
+   O'Reilly Verlag in Ihr CD-ROM-Laufwerk ein.
+
+2) CD-ROM mounten:
+
+   Mounten Sie die CD-ROM, z.B. mit "mount /cdrom" (dies setzt allerdings
+   einen entsprechenden Eintrag in der Datei "/etc/fstab" voraus).
+
+3) In das "BnP"-Verzeichnis wechseln:
+
+   Wechseln Sie mit "cd /cdrom/BnP" (o.ae.) in das "BnP"-Verzeichnis auf
+   der CD-ROM.
+
+>> Variante _OHNE_ CD-ROM:
+   -----------------------
+
+1) Download-Tool installieren:
+
+   Falls Ihnen keine lokale Kopie des CPAN (= "Comprehensive Perl Archive
+   Network") auf Ihrer Festplatte zur Verfuegung steht, und falls auf Ihrem
+   System weder der ASCII-Internet-Browser "lynx" noch der Resource-Fetcher
+   "snarf" vorhanden ist, muessen Sie zuerst eines dieser beiden Programme
+   installieren (oder die Konfiguration in den Dateien "build" und "BnP.pm"
+   um ein weiteres solches Tool erweitern).
+
+   (Falls Sie eine Spiegelung des CPAN auf Ihrer Festplatte besitzen
+   sollten, fahren Sie gleich mit Punkt 2) direkt hierunter fort.)
+
+   "snarf" (= "Simple Non-interactive All-purpose Resource Fetcher") hat
+   sich bereits auf vielen Unix-Systemen bewaehrt und ist sehr einfach zu
+   installieren und zu benutzen und wird deshalb hier empfohlen; "lynx"
+   ist fuer das nicht-interaktive automatische Downloaden zwar nicht ganz
+   so gut geeignet, laesst sich hier aber ebenfalls verwenden.
+
+   Beachten Sie, dass Sie eine aeltere, aber dafuer sehr stabile Version
+   von "snarf" auch mit Hilfe von "Build'n'Play" selbst installieren koennen,
+   und zwar mit Hilfe des Befehls "./build tools.snarf". Fuer weitere Aufruf-
+   parameter, die Sie dabei vielleicht noch zusaetzlich benoetigen, siehe die
+   unter Punkt 6) folgende Beschreibung des "build"-Kommandos.
+
+   Legen Sie dazu innerhalb des Verzeichnisses, das beim Auspacken der
+   Distribution von "Build'n'Play" entstanden ist, ein Unterverzeichnis
+   namens "src" an (falls noch nicht vorhanden).
+
+   Laden Sie anschliessend die Datei "snarf-1.6.1b.tar.gz" mittels anonymous
+   ftp von der Adresse "ftp://ftp.mint.net/pub/snarf/" oder von der Adresse
+   "ftp://ftp.engelschall.com/pub/bnp/packages/" herunter und legen Sie sie
+   in das soeben erstellte "src"-Unterverzeichnis.
+
+   (Falls das Unterverzeichnis "src" in Ihrer Distribution schon existiert,
+   enthaelt es diese Quelldatei bereits!)
+
+   Geben Sie nun das Kommando "./build tools.snarf" (mit den evtl. zusaetz-
+   lich erforderlichen Parametern) ein und fahren Sie dann wie im folgenden
+   beschrieben fort.
+
+2) Suchpfade und URLs fuer CPAN angeben:
+
+   Geben Sie bei den weiter unten beschriebenen Aufrufen von "build" immer
+   zusaetzlich mit Hilfe des Parameters "-s" den Pfad zu der lokalen Kopie
+   des CPAN auf Ihrer Festplatte (so vorhanden) an, sowie wahlweise mit Hilfe
+   der Option "-u" die URL eines CPAN Mirror-Servers (z.B. in Ihrem lokalen
+   Netzwerk), falls Sie nicht die Server "ftp.funet.fi" oder "www.perl.com"
+   (letzterer mit automatischem Redirect) verwenden wollen, die bereits
+   standardmaessig in "Build'n'Play" vorkonfiguriert sind.
+
+   (Sie koennen dabei auch (mit weiteren Optionen "-u <url>") mehrere URLs
+   angeben, z.B. fuer alternative Server oder fuer die Server von unterschied-
+   lichen Software-Paketen. Alle URLs werden in der angegebenen Reihenfolge
+   durchprobiert. Suchpfade auf der Festplatte haben jedoch gegenueber den
+   URLs Vorrang, da hier der Zugriff natuerlich wesentlich schneller ist.)
+
+3) In das "BnP"-Verzeichnis wechseln:
+
+   Wechseln Sie mit "cd" in das Verzeichnis, das beim Auspacken der
+   "Build'n'Play"-Distribution entstanden ist.
+
+>> Weiter mit _BEIDEN_ Varianten:
+   ------------------------------
+
+4) Test-Aufruf des "build"-Kommandos:
+
+   Rufen Sie jetzt den "build"-Befehl mit "./build" auf.
+
+   Beim Aufruf ohne weitere Parameter gibt dieses Tool eine Hilfe aus.
+
+   Sollte es mit diesem Befehl auf Ihrem System Schwierigkeiten geben,
+   muessen Sie moeglicherweise ueberall "sh ./build" anstelle von
+   "./build" eingeben!
+
+5) Vorarbeiten:
+
+   Falls Sie zum ersten Mal und nicht unter FreeBSD installieren, muessen
+   Sie entweder _VOR_ der Installation das jeweilige Installations-Skript
+   "<target>.bnp" noch an Ihr Betriebssystem anpassen, oder Sie koennen
+   das auch nach und nach, im Laufe der Installation an den Stellen tun,
+   an denen Fehler auftreten.
+
+   (Hierbei steht "<target>" fuer das zu installierende Software-Paket;
+   in der aktuellen Version von "Build'n'Play" sind die folgenden fuenf
+   Installations-Skripte verfuegbar: "perl.bnp", "tools.bnp", "gimp.bnp",
+   "imagick.bnp" (fuer "ImageMagick") sowie "sfio.bnp". Weitere Instal-
+   lations-Skripte, z.B. fuer apache, gcc, pgp, samba, squid, ssh, tex,
+   wuftp, ..., muessen noch von der Version 1.0 von "BnP" auf die
+   aktuelle Version portiert werden.)
+
+   Kopieren Sie dazu ggfs. zunaechst die "Build'n'Play"-Dateien von der
+   CD-ROM auf Ihre Festplatte, und zwar zum Beispiel mit den Befehlen
+
+           % cd /cdrom; tar cf - BnP | ( cd /tmp; tar xBpf - )
+           % cd /tmp/BnP
+
+   (Achten Sie darauf, dass Sie auch die (leere) Datei ".cdrom" mit kopieren
+   oder im Zielverzeichnis wieder anlegen, falls Sie nicht wie oben beschrie-
+   ben vorgehen, wenn Sie spaeter "BnP" selbst auch in der von "BnP" ange-
+   legten Verzeichnishierarchie installieren wollen (d.h. wenn Sie u.a.
+   die Manual Pages von "Build'n'Play" installieren wollen.)
+
+   Fahren Sie anschliessend im folgenden so fort wie jeweils unter "ohne
+   CD-ROM" beschrieben.
+
+   Wenn Sie "BnP" auf Ihre Festplatte kopieren und anschliessend nur noch
+   von dort aus starten, sollten Sie jedoch bei allen Aufrufen von "build"
+   stets mit Hilfe der Option "-s" den Pfad zu Ihrem CD-ROM-Laufwerk angeben,
+   falls dieser nicht "/cdrom" oder "/cdrec" lautet, da sonst die Quell-
+   dateien aus dem CPAN nicht mehr gefunden werden!
+
+   Um die Datei "perl.bnp" an Ihr Betriebssystem "<os>" anzupassen, koennen
+   Sie sich uebrigens auch der Datei "perl.bnp.diff.<os>" bedienen, falls
+   fuer Ihr Betriebssystem eine solche vorhanden ist; am besten unter Zu-
+   hilfenahme des Tools "patch" (einem weiteren genialen Tool von Perl-
+   Erfinder Larry Wall!) wie folgt:
+
+           % patch perl.bnp <perl.bnp.diff.linux
+
+   Zur Not koennen Sie diese Aenderungen auch von Hand einarbeiten,
+   was einigermassen leicht fallen sollte, da es sich zum einen nur
+   um relativ wenige Aenderungen handelt, und zum anderen die Dateien
+   "perl.bnp.diff.<os>" aus Kontext-Diffs bestehen, was das Wiederfinden
+   der entsprechenden Stellen erleichtert.
+
+   Das Tool "patch" koennen Sie uebrigens auch mit Hilfe von "Build'n'Play"
+   selbst installieren, und zwar mittels des Befehls "./build tools.patch".
+
+   (Vergessen Sie jedoch ggfs. Ihre Aufrufparameter "-p" und "-g" nicht,
+   und legen Sie - falls gewuenscht - mit der Option "-r" ein geeignetes
+   Unterverzeichnis fest. Naeheres hierzu siehe im folgenden Abschnitt.)
+
+6) Aufruf-Parameter des "build"-Kommandos:
+
+   Um Perl vollstaendig zu installieren, geben Sie anschliessend
+   "./build perl" ein (auf einem Pentium 133 dauert das etwa drei Stunden).
+
+   Falls Sie jedoch nur Perl selbst, und vorlaeufig noch keine Module
+   installieren wollen, koennen Sie statt dessen auch den Befehl
+   "./build perl.core" verwenden (Dauer etwa zwanzig Minuten).
+
+   Um spaeter (nachtraeglich) alle Module zu installieren, koennen Sie
+   den Befehl "./build perl.modules" benutzen.
+
+   Falls Sie lediglich die im Buch "Programmieren mit Perl-Modulen" be-
+   sprochenen Module installieren wollen, geben Sie "./build perl.fox" ein.
+
+   (Der Fuchs ist das Tier auf dem Titelbild des Buchs.)
+
+   Falls Sie Perl selbst sowie nur die im Buch besprochenen Module
+   installieren wollen, koennen Sie auch den Befehl "./build perl.core.fox"
+   verwenden.
+
+   (Dieser Mechanismus zur Auswahl einer oder mehrerer Untermengen
+   funktioniert so bei allen Zielen oder "Targets", vorausgesetzt in der
+   entsprechenden Datei "<target>.bnp" wurden solche Teilmengen definiert.
+   Um die Namen oder "Etiketten" der verfuegbaren Teilmengen eines
+   Installations-Skripts "<target>.bnp" herauszubekommen, koennen Sie den
+   Befehl "./misc/tags <target>" verwenden, also z.B. "./misc/tags perl".
+   Sie koennen spaeter auch selbst neue Untermengen in bereits bestehenden
+   Installations-Skripten definieren, die dann augenblicklich (ohne irgend-
+   eine weitere Form der Deklaration oder Einbindung zu benoetigen) auf
+   dieselbe Art und Weise angesprochen werden koennen.)
+
+   Die Installation erfolgt defaultmaessig in die Verzeichnisse
+   "/usr/local/bin", "/usr/local/lib" und "/usr/local/man".
+
+   Um ein anderes Praefix als "/usr/local" zu verwenden, koennen Sie die
+   Option "-p" von "build" einsetzen. Siehe dazu auch die von "build"
+   ausgegebene Hilfe (beim Aufruf ohne Parameter).
+
+   Beachten Sie, dass Sie ausserdem mit Hilfe der Option "-s" einen Pfad
+   (oder mehrere Pfade) zu Ihrem CD-ROM-Laufwerk (falls dieser Pfad nicht
+   "/cdrom" oder "/cdrec" lautet) oder einer lokalen Kopie des CPAN auf
+   Ihrer Festplatte angeben koennen.
+
+   Sie koennen dabei mehrere Pfade auch mit ":" verketten und als ein
+   einziges Argument uebergeben, oder Sie koennen jeden Pfad separat
+   mit einer eigenen Option "-s" angeben, oder beide Formen mischen.
+
+   (Sie sollten uebrigens das evtl. vorhandene ".../CPAN" am Ende eines
+   Pfades _NICHT_ mit angeben, duerfen das aber tun, obwohl das hier
+   keinerlei Vorteile bringt.)
+
+   Sie koennen zudem mit Hilfe der Option "-u" weitere URLs (zusaetzlich zu
+   den bereits vorkonfigurierten) fuer das automatische Herunterladen von
+   Quelldateien festlegen (diese URLs sollten _IMMER_ mit ".../CPAN" enden,
+   falls es sich dabei um einen CPAN-Mirror-Server handelt).
+
+   Wenn Sie darueber hinaus die durch "build" durchgefuehrten Installationen
+   auf eine Art und Weise vornehmen wollen, die spaeter eine garantiert
+   rueckstandsfreie De-Installation erlaubt, benutzen Sie ausserdem die
+   Option "-g".
+
+   Zu dieser Option "-g" finden Sie eine ausfuehrliche und interessante
+   Erlaeuterung in der Datei "genopt.txt" (auf Deutsch).
+
+   WICHTIG: Haben Sie sich einmal fuer eine bestimmte Variante entschieden,
+            sollten Sie bei ALLEN Zielen ("clean", "bnp", "perl", ...) IMMER
+            DIESELBEN Parameter (das Praefix mittels der Option "-p" und
+            wahlweise die Option "-g") verwenden, damit nicht MEHRERE UNTER-
+            SCHIEDLICHE Installationshierarchien angelegt werden!
+            (Jeder Aufruf von "build" legt automatisch eine Installations-
+            hierarchie an, falls diese noch nicht existiert, die von diesen
+            beiden Parametern abhaengt.)
+
+   Die Option "-r" kann darueber hinaus benutzt werden, um fuer ein be-
+   stimmtes (externes) Ziel oder "Target" ein geeignetes Unterverzeichnis
+   festzulegen, um so thematisch zusammengehoerige Software-Pakete in gemein-
+   samen Unterverzeichnissen zusammenzufassen und hierarchisch einzuordnen.
+
+   (Dabei sind die Ziele "clean" und "bnp" intern, d.h. in "build" fest ein-
+   gebaut, und alle anderen Ziele extern, d.h. in einer Datei "<target>.bnp"
+   ausprogrammiert.)
+
+   Da Sie also immer dieselben Parameter "-p" und "-g" verwenden sollten,
+   ist es zweckmaessig, diese von Ihnen bevorzugte Variante als Default-Werte
+   fest in das "build"-Tool einzukonfigurieren.
+
+   Um diese (oder auch noch weitere) Konfigurations-Parameter veraendern zu
+   koennen, muessen Sie zuerst alle "BnP"-Dateien (wie eingangs unter Punkt 5)
+   beschrieben) auf Ihre Festplatte kopieren.
+
+   Bearbeiten Sie anschliessend die Konfiguration von "build" wie gewuenscht.
+
+   Editieren Sie auch die Datei "<target>.bnp" und nehmen Sie alle
+   gewuenschten Aenderungen vor.
+
+   HINWEIS: Anstatt die Konfiguration der Installations-Skripte zu aendern,
+            ist es in manchen Faellen auch moeglich, diese mit Hilfe von
+            Umgebungsvariablen zu "ueberstimmen". Untersuchen Sie dazu
+            ggfs. die betreffende Datei "<target>.bnp"!
+
+   Im Falle von "perl.bnp" werden die folgenden Umgebungsvariablen abgefragt:
+
+       BNP_HTML          -   Erzeugung der HTML-Manpages (Ein "1" / Aus "0")
+       BNP_THREADS       -   Compiliere Perl mit Threads (Ein "1" / Aus "0")
+       BNP_PERLVERSION   -   zu installierende Perl-Version ("perl5.005_02")
+       BNP_FLAGS         -   beliebige Flags fuer Configure (z.B. "-Dcc=cc")
+
+   Beispiele fuer die Belegung der letzteren Umgebungsvariablen:
+
+           % export BNP_FLAGS="-Dcc=gcc"
+           % export BNP_FLAGS="-Doptimize=-O2"
+           % export BNP_FLAGS="-Dcc=gcc -Doptimize=-O2"
+
+   Diese letztere Umgebungsvariable wird auch in "tools.bnp" erkannt.
+
+7) Arbeiten mit "Build'n'Play":
+
+   Sollte die Installation mit einer Fehlermeldung abbrechen, so untersuchen
+   Sie das betreffende Modul, warum es sich nicht erfolgreich kompilieren
+   laesst. Gehen Sie dazu ggfs. in das Distributions-Verzeichnis des
+   betreffenden Moduls im internen temporaeren Arbeitsverzeichnis
+   ("<Praefix>/lib/BnP/tmp" bzw. "<Praefix>/pkg/BnP/tmp" bei Verwendung
+   der Option "-g"), geben Sie "make realclean" ein und versuchen Sie,
+   das Modul von Hand zu installieren.
+
+   Sobald Sie herausgefunden haben, auf welche Weise sich das betreffende
+   Modul auf Ihrem System erfolgreich installieren laesst, nehmen Sie
+   entsprechende Aenderungen an der Datei "<target>.bnp" vor.
+
+   Nach einem Fehlerabbruch brauchen Sie diese Datei uebrigens nicht mehr
+   von Hand auf Ihre Festplatte zu kopieren; im Falle eines fehlerhaften
+   Abbruchs wird dies durch das Kommando "build" bereits automatisch
+   erledigt (nicht jedoch bei einem Abbruch mit "Ctrl-C"!) - und zwar
+   auch dann, wenn Sie "build" aus der entpackten Original-Distribution
+   von der Festplatte gestartet haben!
+
+   Sie finden diese Datei anschliessend im Verzeichnis
+   "<Praefix>/lib/BnP/lib/<target>" bzw. "<Praefix>/lib/BnP/<target>"
+   (bei Verwendung der Option "-g").
+
+   Beachten Sie, dass diese Datei (in dem einen der genannten beiden
+   Verzeichnisse) Vorrang vor allen anderen Instanzen dieser Datei (z.B.
+   von der CD-ROM oder aus der Original-Distribution) hat. Nur wenn Sie
+   sie dort loeschen, wird zuerst versucht, sie in demselben Verzeichnis
+   zu finden, aus dem das "build"-Kommando selbst herkam, oder in den von
+   Ihnen angegebenen Pfaden, oder in einigen voreingestellten Pfaden (z.B.
+   "/cdrom" und "/cdrec"), in dieser Reihenfolge.
+
+   Falls Sie die von Ihnen an der Datei "<target>.bnp" vorgenommenen
+   Aenderungen ueberpruefen wollen, loeschen Sie am besten das Distributions-
+   Verzeichnis des betreffenden (fehlerhaften) Moduls im internen temporaeren
+   Arbeitsverzeichnis noch einmal GANZ. Loeschen Sie dann auch am Ende der
+   Datei "recover.bnp" (diese befindet sich im selben Verzeichnis wie die
+   Datei "<target>.bnp") alle Befehle ab dem Befehl "system gunzip -c ..."
+   (einschliesslich), die sich auf das betreffende Modul beziehen.
+
+   Geben Sie anschliessend den "build"-Befehl mit exakt denselben Parametern
+   wie vorher noch einmal ein, um die Installation an der Abbruchstelle
+   (bzw. in diesem Falle am Beginn der Installation des betreffenden Moduls)
+   fortzusetzen.
+
+   Falls Sie nicht herausfinden koennen oder wollen, wie sich das Modul,
+   bei dem der Abbruch stattfand, installieren laesst, koennen Sie es
+   in der Datei "<target>.bnp" auch einfach auskommentieren.
+
+   (Auf einigen Systemen fuehrt beispielsweise das Ueberpruefen von Perl
+   mittels "make test" zu Fehlern, obwohl Perl in Ordnung ist, z.B. wenn
+   keine geeignete "db"-Bibliothek gefunden wurde. In diesem Falle sollte
+   man den entsprechenden Befehl in "perl.bnp" nicht verwenden, sondern
+   auskommentiert lassen.)
+
+   Falls die Installation des betreffenden Moduls mehrere Kommandos umfassen
+   sollte, koennen Sie zum Auskommentieren auch die beiden Methodenaufrufe
+   "$BnP->ignore();" VOR und "$BnP->resume();" HINTER dem auszukommentierenden
+   Abschnitt einfuegen, um nicht alle Kommandos einzeln von Hand auskommen-
+   tieren zu muessen.
+
+   Starten Sie anschliessend den "build"-Befehl mit exakt denselben Parametern
+   wie vorher noch einmal, um die Installation hinter dem auskommentierten
+   Modul fortzusetzen.
+
+   Dabei wird die folgende Warnungsmeldung erscheinen:
+
+       BnP: ! Next command deviates from the automatic recovery file -
+       BnP: ! discarding the remainder of the automatic recovery file!
+
+   Diese Warnungsmeldung besagt, dass die naechsten auszufuehrenden
+   Installations-Kommandos (fuer das Modul NACH dem auskommentierten Modul)
+   sich von den in der Datei "recover.bnp" mitprotokollierten Kommandos
+   (zur Installation des inzwischen auskommentierten Moduls) unterscheiden.
+
+   Diese Warnungsmeldung ist nach dem Auskommentieren eines Moduls (falls
+   Sie es nicht vorziehen, die betreffenden Installations-Kommandos aus der
+   Datei "recover.bnp" zu loeschen) jedoch voellig normal und braucht Sie
+   hier nicht weiter zu beunruhigen.
+
+8) Weitere Dokumentation, Installation von "Build'n'Play" selbst:
+
+   Beachten Sie auch die weiterfuehrende Dokumentation in den Dateien
+   "build.pod", "genopt.pod", "genopt.txt" sowie "BnP.pm", bzw. die
+   Manual Pages, die daraus erzeugt werden koennen.
+
+   Rufen Sie zur Installation von "BnP" (und damit auch zur Erzeugung
+   und Installation der Manual Pages von "Build'n'Play") das Kommando
+   "./build bnp" auf (vergessen Sie dabei jedoch nicht Ihre persoenliche
+   Standardeinstellung fuer die Optionen "-p" und "-g"!).
+
+   Nachdem Sie das Verzeichnis "<Praefix>/man" in ihren Suchpfad "$MANPATH"
+   fuer Manual Pages eingehaengt haben (siehe dazu auch den folgenden
+   Abschnitt 9)), koennen Sie die Manual Pages mit den Befehlen "man build",
+   "man genopt", "man 3 genopt" und "man BnP" aufrufen.
+
+   Sie koennen diese Dateien jedoch auch direkt lesen, da sie entweder in
+   POD (= "Plain Old Documentation", dem Perl-Standard fuer Dokumentation)
+   geschrieben sind oder als reine Text-Datei ("genopt.txt") vorliegen.
+
+   (POD ist eine Markierungs-Sprache aehnlich wie HTML, im Gegensatz zu
+   letzterer jedoch ausdruecklich auch fuer menschliche Leser gedacht.)
+
+   Beachten Sie dabei insbesondere die Datei "build.pod" (bzw. "man build"),
+   in der unter anderem die Verzeichnisstrukturen beschrieben sind, die
+   "Build'n'Play" aufbaut bzw. verwendet.
+
+   Beachten Sie weiter, dass die Erzeugung der Manual Pages das Perl-Tool
+   "pod2man" benoetigt; aus diesem Grund laesst sich "BnP" nur installieren,
+   falls bereits eine Perl 5-Installation vorhanden ist bzw. Perl vorher
+   erfolgreich mit Hilfe von "BnP" installiert wurde.
+
+   (Solange also "Build'n'Play" noch mit dem beim Bootstrapping von Perl
+   erzeugten "miniperl" arbeitet, laesst sich "BnP" nicht installieren.)
+
+   ACHTUNG: Beachten Sie, dass der Befehl "build bnp" eine evtl. bereits
+            vorhandene und ggfs. von Ihnen modifizierte Installation von
+            "BnP" ohne Warnung ueberschreibt!
+
+   Solange die durch "build bnp" installierten Dateien im jeweils richtigen
+   Verzeichnis auf der Festplatte existieren, haben sie automatisch Vorrang
+   gegenueber den gleichen Dateien von der CD-ROM oder aus der Original-
+   Distribution. Und zwar gilt dies einzeln fuer jede Datei, nicht fuer alle
+   Dateien gemeinsam, d.h. Sie koennen durch selektives Loeschen genau beein-
+   flussen, welche Datei von der Festplatte und welche Datei von der CD-ROM
+   (bzw. aus der Original-Distribution) angezogen wird.
+
+9) Suchpfade einstellen:
+
+   Und das wichtigste zuletzt:
+
+   Vergessen Sie nicht, das Verzeichnis "<Praefix>/bin" in Ihren Suchpfad
+   "$PATH" mit aufzunehmen!
+
+   Z.B. durch die Shell-Kommandos
+
+           % PATH="/mein/installations/pfad/bin:$PATH"
+           % export PATH
+
+   Desgleichen fuer das Verzeichnis "<Praefix>/man" und den Suchpfad
+   "$MANPATH" fuer Manual Pages.
+
+   Das sollten Sie sicherheitshalber (um es nicht zu vergessen) bereits
+   VOR der Installation erledigen; auch sollten Sie diese Befehle in das
+   Initialisierungs-Skript Ihrer bevorzugten Shell (z.B. ".bashrc") in
+   Ihrem Home-Verzeichnis, oder global fuer alle Benutzer (i.d.R. in
+   "/etc/profile") mit aufnehmen.
+
+Viel Spass und Erfolg beim Installieren!
+
+
+Hinweise:
+
+=========
+
+Die folgenden Module sind zwar Teil der im Buch "Programmieren mit Perl-
+Modulen" besprochenen Module, sie werden jedoch auch durch "build perl.fox"
+NICHT mit installiert:
+
+    -  mod_perl
+    -  CPAN et al.
+    -  Gimp
+    -  PerlMagick (fuer ImageMagick)
+
+Der Grund hierfuer liegt darin, dass "mod_perl" und "CPAN" INTERAKTIVE
+Installationen sind und der Benutzer einige Daten ueber sein System bzw.
+seine Wuensche zur Konfiguration eingeben muss, waehrend "Build'n'Play"
+von seinem Konzept her aber eigentlich ein Batch-Tool ist.
+
+Diese beiden Module lassen sich jedoch durch die EXPLIZITE Angabe ihres
+"Etiketts" beim Aufruf von "build" installieren:
+
+    % ./build perl.modperl
+    % ./build perl.cpan
+
+Man kann dabei auch mehrere "Etiketten", mit Punkten voneinander getrennt,
+an das Ziel "perl" anhaengen, also beispielsweise
+
+    % ./build perl.core.fox.modperl.cpan
+
+Die Perl-Module "Gimp" und "PerlMagick" erfordern das Vorhandensein der
+entsprechenden C-Bibliotheken und koennen deshalb nicht automatisch und
+pauschal auf jedem System installiert werden.
+
+Vielmehr gibt es dafuer eigene Ziele ("Targets") in "build", um diese
+Software-Pakete einschliesslich ihrer Perl-Anbindung zu installieren
+(siehe dazu auch die von "build" ausgegebene Hilfe).
+
+Bevor Sie dies tun koennen, muessen Sie allerdings zuerst Perl (mindestens
+"perl.core" - ggfs. werden aber auch noch weitere Perl-Module vorausgesetzt)
+erfolgreich installiert haben.
+
+
+Autoren:
+========
+
+Die Idee und erste private Versionen von "Build'n'Play" stammen von:
+
+  Ralf S. Engelschall
+
+  rse@engelschall.com
+  www.engelschall.com
+
+Die vorliegende erste oeffentliche Programmversion (eine vollstaendige
+Neuentwicklung) von "Build'n'Play" stammt von:
+
+  Steffen Beyer
+
+   sb@engelschall.com
+  www.engelschall.com/u/sb/download/
+
+
+Urheberrechte:
+==============
+
+Copyright (c) 1996 - 1998 by Ralf S. Engelschall.
+Alle Rechte vorbehalten.
+
+Copyright (c) 1998 by Steffen Beyer.
+Alle Rechte vorbehalten.
+
+
+Lizenz:
+=======
+
+"Build'n'Play" ist Freie Software und kann unter denselben Lizenzbedingungen
+benutzt, modifiziert und weitergegeben werden wie Perl, d.h. es gelten die
+Bestimmungen der "Artistic License" oder (wahlweise) der "GNU General Public
+License".
+
+Bitte beachten Sie die beiden Dateien "Artistic.txt" und "GNU_GPL.txt" in
+dieser Distribution fuer die entsprechenden Details!
+
+
+Haftungsausschluss:
+===================
+
+Die vorliegende Software wird so zur Verfuegung gestellt wie sie ist, es
+werden keinerlei Garantien fuer ihre Eignung fuer welche Zwecke auch immer
+abgegeben, und es wird auch keine Haftung fuer die durch ihre Verwendung
+oder Nichtverwendbarkeit moeglicherweise verursachten Schaeden oder Ausfaelle
+oder dergleichen uebernommen, selbst wenn dem Autor solche moeglichen Folgen
+bekannt sein oder bekannt gemacht werden sollten.
+
+Siehe dazu auch die "GNU General Public License" fuer weitere Details.
+
+
+Sonstiges:
+==========
+
+Wenn Sie in "Build'n'Play" Fehler finden oder Unterstuetzung benoetigen,
+wenden Sie sich bitte an Steffen Beyer <sb@engelschall.com>.
+
+Vielen Dank!
+
+

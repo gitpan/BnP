@@ -1,0 +1,718 @@
+
+                                 GenOpt
+                                 ======
+
+
+                            Zusammenfassung:
+
+    GenOpt ist ein Werkzeug, um auf einem Unix-System viele Anwendungs-
+    pakete uebersichtlich und mit geringem Aufwand zu installieren. Das
+    De-Installieren wird ebenfalls erheblich erleichtert. Die zu einer
+    Anwendung gehoerenden Dateien (Binaries, Handbuecher, Bibliotheken
+    usw.) werden in einem eigenen Verzeichnis-Teilbaum zusammen abge-
+    speichert. Es gibt zentrale Verzeichnisse fuer Binaries, Handbuecher
+    etc., die die Benutzer in ihrem Suchpfad haben muessen, um die mit
+    GenOpt verwalteten Anwendungen aufrufen zu koennen. Die entscheidende
+    Idee von GenOpt besteht darin, dass von diesen zentralen Verzeichnissen
+    aus symbolische Links zu den Anwendungsdateien fuehren. GenOpt verwaltet
+    diese Links.
+
+    Definition durch den Autor Ralf S. Engelschall:
+
+       `` _Gen_eration of a compact central access layer
+          for a large pool of locally installed
+          _opt_ional Unix software,
+          distributed with complete sources ''
+
+    __
+    Dieses Dokument entstand aus einem Vortrag von Ralf S. Engelschall
+    bei sd&m am 10.03.1995 und wurde von Steffen Beyer umfassend ueber-
+    arbeitet.
+
+
+  ____________________________________________________________________________
+
+  INHALTSVERZEICHNIS
+
+  1. Software-Installation?
+  2. GenOpt
+      2.1 Wie sieht das aus, was GenOpt erzeugt?
+      2.2 Wie installiert man Software mit GenOpt?
+          2.2.1 Einspielen der Software
+          2.2.2 Auspacken der Software
+          2.2.3 GenOpt-kompatible Anpassung der zu installierenden Software
+          2.2.4 Einhaengen des Pakets mit GenOpt
+          2.2.5 Verschieben eines Pakets
+          2.2.6 De-Installieren des Pakets
+      2.3 Hinweise
+  3. Resuemee des Autors Ralf S. Engelschall
+  4. Tips & Tricks
+  ____________________________________________________________________________
+
+
+
+  1. Software-Installation?
+
+  Es gibt verschiedene Methoden, mit dem Problem der Software-Installation
+  umzugehen. Sie alle haben unterschiedliche Vor- und Nachteile. Ein paar
+  besonders gaengige Vorgehensweisen seien zur Einfuehrung in dieses Thema
+  kurz vorgestellt:
+
+    - 'copy & stay forever'
+
+      Das ist die uebliche Methode auf PCs unter DOS/Windows. Neue Pakete
+      werden auf die Maschine kopiert und dort so verteilt, dass man kaum
+      noch weiss, welche Dateien (oder Zeilen in .ini-Dateien von Windows!)
+      zu welcher Anwendung gehoeren. Die Folge ist: Niemand kennt sich mehr
+      aus, selten wird ein Paket einmal tatsaechlich komplett de-installiert.
+      Inzwischen gibt es Werkzeuge, die beim Umgang mit diesem Dilemma
+      helfen sollen (Un-Installer). Jedoch koennen auch damit beim De-
+      installieren Probleme auftreten, insbesondere bei von vielen Programmen
+      gemeinsam benutzten Programmbibliotheken (shared libraries oder DLLs).
+
+      Mit dieser Methode ist auf Unix-Maschinen (aufgrund der meist noch
+      hoeheren Anzahl und Komplexitaet der Anwendungen!) die Verwaltung der
+      installierten Softwarepakete nicht mehr beherrschbar, vor allem nicht
+      auf Servern (wo zum Teil eine erhebliche Fluktuation der installierten
+      Software besteht, z.B. um neue Software auszuprobieren oder um sich
+      aendernden Anforderungen der Benutzer gerecht zu werden).
+
+      ==> installation    : simple
+          de-installation : impossible!!
+
+    - 'package installation' (z.B. Solaris etc.)
+
+      Auf manchen Systemen gibt es eigens vorgesehene Mechanismen zum
+      Installieren und De-Installieren von Programmpaketen (z.B. Unix
+      System V - Derivate). Diese erfordern allerdings fuer jedes Programm-
+      paket jeweils eine Reihe von Hilfsdateien, die zudem meistens (ausser
+      z.B. beim Betriebssystem-Hersteller) nicht mitgeliefert werden. Sie
+      selbst zu erstellen scheitert oft am Zeitmangel (die Erstellung kann
+      durchaus eine Woche kosten) oder an ungenuegender Dokumentation der
+      Package-Installations-Systeme.
+
+      ==> installation    : sometimes very simple
+          de-installation : sometimes very simple
+
+    - '/usr/local/dist'-Loesung (z.B. TU Muenchen)
+
+      Bei dieser Methode wird jede Anwendung in einem separaten Verzeichnis
+      abgelegt. Im Verzeichnis /usr/local/dist befindet sich dabei eine grosse
+      Anzahl von Symbolic Links, die jeweils auf eins dieser Verzeichnisse
+      zeigen. Dabei werden diese Links aber manuell erstellt, da kein Tool
+      vorhanden ist, um dies zu automatisieren. Das fuehrt in der Praxis dann
+      dazu, dass manche Applikationen korrekt (also vollstaendig ueber Links
+      erreichbar) installiert sind, andere dagegen gar nicht erst in die
+      /usr/local/dist-Hierarchie eingehaengt wurden. Die Installation ist
+      bei dieser Methode also schwer, da manuell, und das De-Installieren
+      ebenfalls, da man genau wissen muss, welche Links entfernt werden
+      muessen.
+
+      ==> installation    : hard
+          de-installation : hard
+
+    - 'GenOpt'
+
+      Dies ist eine Moeglichkeit, eine Installation nach der obigen Methode
+      (/usr/local/dist) durchzufuehren, jedoch mit der Unterstuetzung durch
+      ein entsprechendes Werkzeug (also aehnlich wie bei der oben genannten
+      "package installation", jedoch werden im Unterschied zu dieser keine
+      speziellen Installations- und Deinstallations-Skripte benoetigt!), und
+      zwar sowohl fuer die vorbereitenden Schritte (Anlegen einer Verzeichnis-
+      struktur zur Aufnahme der zu installierenden Software) als auch das
+      nachfolgende Anlegen und ggfs. Loeschen von entsprechenden Links.
+      Voraussetzung hierfuer ist, dass die zu installierende Anwendung
+      konfigurierbar ist, d.h. keine fest verdrahteten Pfade enthaelt.
+      Im guenstigsten Fall liegt sie gar im Quellcode vor, der entsprechend
+      angepasst werden kann.
+
+      ==> installation    : easy
+          de-installation : easy
+
+
+  2. GenOpt
+
+  Hinter diesem Namen verbirgt sich ein BourneShell-Skript von rund 40 KB
+  Laenge. Ausser den internen BourneShell-Konstrukten werden nur Standard-
+  Unix-Werkzeuge (wie cat, ls, sed, awk etc.) verwendet, denn GenOpt soll
+  auch schon bei der Neuinstallation einer Unix-Maschine einsetzbar sein
+  (Bootstrapping!).
+
+
+  2.1 Wie sieht das aus, was GenOpt erzeugt?
+
+  GenOpt erzeugt an einer frei waehlbaren Stelle im Dateisystem des Rechners
+  eine Zugangs-Schnittstelle zu den installierten Anwendungen. Diese Stelle
+  heisst auf vielen Systemen ueblicherweise /opt, muss aber nicht. GenOpt
+  kann dementsprechend konfiguriert (Konstante DEFAULT_LOGICAL_ROOT am
+  Anfang des Shell-Skripts) oder beim Aufruf mit Parametern entsprechend
+  gesteuert werden.
+
+  (Der Sinn dieser Zugriffsschicht liegt unter anderem darin, dass es bei
+  einer Vielzahl von separat installierten Anwendungen unmoeglich ist, alle
+  diese Verzeichnisse im Suchpfad (d.h. der Umgebungsvariablen "$PATH")
+  unterzubringen.)
+
+  In diesem Verzeichnis werden einige Unterverzeichnisse angelegt:
+
+  Zugriff durch... ueber GenOpt Schicht...  auf...
+  ---------------- ------------------------ -----------------------------
+                    /opt/pkg/foo-591        foo-591 ist ein Directory-
+                                            Link auf alle Daten der
+                                            Beispielanwendung foo-591
+
+  $PATH             /opt/bin/foo            Anwendungs-Binaries
+                         .../bar
+
+  $MANPATH          /opt/man/man1/foo.1     Dokumentations-Quellen von Unix
+                         .../man8/bar.8     (nroff-Format)
+
+  $INFOPATH         /opt/info/foo.info      Dokumentations-Quellen von GNU
+                          .../foo-1.info    (texinfo-Format)
+
+                    /opt/lib/foo-591        Directory-Link auf das Library-
+                                            Verzeichnis der Anwendung. Dort
+                                            stehen programminterne Dateien
+                                            mit Namen wie foo.cfg, foo.hlp,
+                                            Binaries etc. Die Anwendung ist
+                                            beim Installieren so konfiguriert
+                                            worden, dass sie diese Daten hier
+                                            sucht.
+
+  cc -I             /opt/include/foo.h      C-Header-Dateien
+
+  cc -L, ldconfig   /opt/shlib/libfoo.a     Static und Runtime-Shared-Libraries
+                           .../libfoo.so.2
+
+  $XAPPLRESDIR      /opt/xad/Foo            X11 Application Defaults
+                         .../Bar
+
+  Auf die Daten in /opt/shlib greift z.B. der Kernel zur Laufzeit zu,
+  auf die Daten in /opt/xad die X11-Applikationen ueber die libX11.
+
+  Diese Struktur darf nicht ohne weiteres von Hand veraendert werden, wenn
+  man nicht riskieren will, GenOpt zu verwirren. Das ist ganz analog zu den
+  in einem internen Format abgespeicherten Datensaetzen eines Datenbanksystems!
+
+  (Bestimmte Operationen, wie z.B. das Verschieben von Applikationen innerhalb
+  des Dateibaums, sind allerdings unter gewissen Bedingungen moeglich.)
+
+  GenOpt erzeugt ausserdem innerhalb des zentralen Verzeichnisses (in der
+  Regel: /opt) einige Hilfsdateien mit Informationen ueber die von ihm
+  verwalteten Anwendungen. Diese Dateien heissen .genopt.L.* und duerfen
+  genausowenig von Hand angefasst werden wie die Indexdateien einer Datenbank!
+
+
+  2.2 Wie installiert man Software mit GenOpt?
+
+  Softwarepakete installiert man am besten so, dass man sie jeweils in
+  eigenen, vollstaendig voneinander getrennten Verzeichnis-Teilbaeumen
+  ablegt, welche in einem speziell hierfuer eingerichteten Dateibaum
+  mit Kategorien und Unterkategorien (= Verzeichnissen und Unterver-
+  zeichnissen) einsortiert sind (z.B. sortiert je nach Funktionszu-
+  sammenhang). Dieser Dateibaum muss als ein Unterverzeichnis von /opt
+  angelegt werden, wobei der Name jedoch frei konfigurierbar ist, solange
+  er nur nicht zu Konflikten mit den von GenOpt reservierten Namen fuehrt.
+  Fuer diesen Dateibaum hat sich in der Praxis das Verzeichnis /opt/packages
+  bewaehrt (dieser Default-Wert ist bereits in GenOpt so konfiguriert und
+  kann ueber die Konstante DEFAULT_PHYSICAL_ROOT am Anfang des Skripts
+  oder ueber Aufrufparameter entsprechend veraendert werden).
+
+  Fuer alle nachfolgenden Beispiele sei eine neue Anwendung foo-591 im
+  Verzeichnis /opt/packages/diverse/foo-591 untergebracht.
+
+
+  2.2.1 Einspielen der Software
+
+  Zunaechst einmal muss die Verzeichnisstruktur fuer das neue Software-
+  paket aufgebaut werden.
+
+  Das Anlegen der dafuer notwendigen Verzeichnisse kann wahlweise von Hand
+  geschehen oder durch GenOpt selbst:
+
+      % genopt -c /opt/packages/diverse/foo-591
+
+  (Der Parameter "-c" steht dabei fuer "create", "erzeuge".)
+
+  Dieser Aufruf erzeugt die folgenden Verzeichnisse:
+
+      /opt                               (Nur falls noch nicht vorhanden)
+      /opt/packages                      (Nur falls noch nicht vorhanden)
+      /opt/packages/diverse              (Nur falls noch nicht vorhanden)
+      /opt/packages/diverse/foo-591
+      /opt/packages/diverse/foo-591/arc
+      /opt/packages/diverse/foo-591/bin
+      /opt/packages/diverse/foo-591/etc
+      /opt/packages/diverse/foo-591/include
+      /opt/packages/diverse/foo-591/info
+      /opt/packages/diverse/foo-591/lib
+      /opt/packages/diverse/foo-591/man
+      /opt/packages/diverse/foo-591/shlib
+      /opt/packages/diverse/foo-591/texmf
+      /opt/packages/diverse/foo-591/xad
+
+  (Man beachte, dass sich die Liste der angelegten Unterverzeichnisse
+  mit Hilfe des Parameters "-d" auch einschraenken laesst. Mehr dazu
+  siehe spaeter.)
+
+  Ausserdem werden bei diesem Aufruf bereits die ersten wichtigen symbolischen
+  Links erzeugt, unter anderem
+
+      /opt/pkg/foo-591 -> /opt/packages/diverse/foo-591
+
+  (Mehr zu diesem Link siehe weiter unten.)
+
+  Zu den einzelnen Verzeichnissen:
+
+  Anlegen des Verzeichnisses /opt/packages/diverse/foo-591
+
+  Dieses Verzeichnis dient der Aufnahme der zu installierenden Applikation.
+  Durch die Speicherung in einem separaten Verzeichnis ist gewaehrleistet,
+  dass die Applikation spaeter rueckstandsfrei (durch Loeschen dieses Ver-
+  zeichnisses) entfernt werden kann.
+
+  Anlegen eines Unterverzeichnisses /opt/packages/diverse/foo-591/arc
+
+  Dies ist unverzichtbar, da GenOpt den wichtigsten Link, naemlich von
+  /opt/pkg/foo-591 nach /opt/packages/diverse/foo-591, nur dann anlegt,
+  wenn es so ein Unterverzeichnis gibt. In diesem Verzeichnis sollten
+  die Quellen archiviert (Name!) werden, z.B. kann man hier eine Datei
+  foo-591.tar.gz ablegen, so wie sie beispielsweise aus dem Internet kommt.
+
+  Ausserdem hat es sich bewaehrt, hier nach der Installation die angepassten
+  Konfigurations-Dateien fuer eine moegliche Wiederverwendung fuer spaeter
+  aufzuheben.
+
+  Anlegen eines Unterverzeichnisses /opt/packages/diverse/foo-591/bin
+
+  Dieses Verzeichnis dient spaeter zur Aufnahme aller zur Applikation
+  gehoerenden ausfuehrbaren Programme.
+
+  Zusammen mit dem "arc"-Unterverzeichnis stellt es die Minimalkonfiguration
+  fuer eine Software-Installation mit GenOpt dar.
+
+  Je nach Bedarf werden ausserdem aus der oben genannten Liste weitere Unter-
+  verzeichnisse angelegt.
+
+
+  2.2.2 Auspacken der Software
+
+  Anlegen eines Verzeichnisses /opt/packages/diverse/foo-591/dist
+
+  Dieses Verzeichnis dient dem Auspacken des Softwarepakets
+  ("dist" = "Distribution"). Beim Auspacken einer tar-Datei
+  ist dies das Zielverzeichnis.
+
+  Die Erstellung eines solchen Unterverzeichnisses ist eine Vorsichts-
+  massnahme, da nicht alle Softwarepakete beim Auspacken wohlgesittet
+  ein eigenes Unterverzeichnis anlegen (mit dem Namen und der Versions-
+  nummer des Softwarepakets), sondern sich der Inhalt der Distribution
+  beim Auspacken oft einfach nur in das gerade aktuelle Verzeichnis
+  "ergiesst".
+
+  In diesem Verzeichnis wird man dann Konfigurationsdateien,
+  Makefiles u.ae. finden, die man im naechsten Schritt anpassen muss.
+
+
+  2.2.3 GenOpt-kompatible Anpassung der zu installierenden Software
+
+  Dieser Schritt ist Handarbeit, aber wesentlich einfacher als beispiels-
+  weise das Erstellen von Hilfsdateien fuer "package install"-Mechanismen.
+
+  Hierbei ist die Existenz des Links
+
+      /opt/pkg/foo-591 -> /opt/packages/diverse/foo-591
+
+  von ganz wesentlicher Bedeutung, da damit der physikalische Pfad der
+  Installation vor der Anwendung selbst verborgen wird, die immer und stets
+  ueber "/opt/pkg/foo-591" zugreift und den wirklichen physikalischen Pfad
+  nicht zu kennen braucht.
+
+  Man muss auf jeden Fall vermeiden, irgendwo in der Applikation den
+  physikalischen Pfad "/opt/packages/diverse/foo-591" fest zu verdrahten,
+  da man sonst spaeter das Programmpaket nicht mehr innerhalb der
+  Installationshierarchie verschieben kann, was zum Beispiel wuenschens-
+  wert ist, um Gruppen von Applikationen zu neuen Unterkategorien zusammen-
+  fassen zu koennen (was bei einigen -zig oder Hunderten von installierten
+  Applikationen zur Wahrung der Uebersicht oftmals noetig werden kann!).
+
+  Eine Applikation, in der der physikalische Pfad fest einkonfiguriert wurde,
+  wuerde in solch einem Fall nicht mehr funktionieren.
+
+  Mit Hilfe des symbolischen Links bekommt sie jedoch von dieser Aenderung
+  nichts mit und funktioniert weiter wie zuvor.
+
+  Bevor man nun zur Compilation der Applikation schreitet, muss man die
+  Anwendung zuerst entsprechend konfigurieren.
+
+  Viele Anwendungen bieten dazu Konfigurations-Werkzeuge an, die in der
+  Regel die Einstellung der zu verwendenden Installations- und Aufruf-
+  pfade erlauben.
+
+  Falls nicht, muss man die Quelldateien so abaendern, dass alle darin
+  vorkommenden fest verdrahteten Pfade den Weg ueber symbolische Links
+  nehmen, und zwar:
+
+      /opt/pkg/foo-591           als allgemeine Basis
+
+      /opt/pkg/foo-591/bin       fuer alle ausfuehrbaren Programme
+
+      /opt/pkg/foo-591/lib       oder eleganter
+      /opt/lib/foo-591           fuer alle vom Programm genutzten Bibliotheken
+
+      /opt/pkg/foo-591/man/man1  fuer alle man- ("Manual", d.h. Handbuch) Pages
+      /opt/pkg/foo-591/man/man3
+      /opt/pkg/foo-591/man/....
+
+      /opt/pkg/foo-591/etc       fuer rc- ("run-configure") Dateien
+      /opt/pkg/foo-591/include   fuer Header-Dateien (*.h)
+      /opt/pkg/foo-591/info      fuer GNU info-Dateien (Dokumentation)
+      /opt/pkg/foo-591/shlib     fuer alle shared libraries
+      /opt/pkg/foo-591/texmf     fuer alle TeX-Ressourcen
+      /opt/pkg/foo-591/xad       fuer alle X-Ressourcen
+
+  Man achte dabei darauf, dass nur diejenigen ausfuehrbaren Programme,
+  die spaeter vom Benutzer direkt aufrufbar sein sollen, in das "bin"-
+  Unterverzeichnis gelegt werden, waehrend alle nur von der Applikation
+  selbst verwendeten Programme in das "lib"-Unterverzeichnis gehoeren!
+
+  Fuer die in all diesen Unterverzeichnissen enthaltenen Dateien wird
+  GenOpt spaeter die entsprechenden Links erzeugen.
+
+  Anschliessend wird die Applikation gebaut, d.h. compiliert.
+
+
+  2.2.4 Einhaengen des Pakets mit GenOpt
+
+  Nach der Compilation der Applikation (meist mit Hilfe von "make")
+  muss nun die Applikation installiert und "verdrahtet" werden.
+
+  Die Installation in die vorher konfigurierten Unterverzeichnisse
+  (/opt/pkg/foo-591/bin etc.) geschieht in der Regel durch den Aufruf
+  von "make install".
+
+  Bei einigen (vor allem kleineren) Applikationen kann es jedoch auch vor-
+  kommen, dass man die erzeugten Binaries, Man-Pages usw. von Hand in die
+  entsprechenden Unterverzeichnisse kopieren (oder verschieben) muss.
+
+  Mit den folgenden einfachen Befehlen wird dann die Applikation "freige-
+  schaltet":
+
+      % cd /opt/packages/diverse/foo-591
+      % genopt .
+
+  oder alternativ
+
+      % genopt /opt/packages/diverse/foo-591
+
+  GenOpt durchsucht nun, ausgehend vom angegebenen Start-Verzeichnis, alle
+  die ihm bekannten Unterverzeichnisse auf vorhandene Dateien, und erzeugt
+  fuer jede gefundene Datei einen entsprechenden symbolischen Link im
+  entsprechenden Verzeichnis der zentralen Zugriffsschicht, also z.B.
+
+      /opt/bin/bar -> ../packages/diverse/foo-591/bin/bar
+
+  Dies gilt entsprechend auch fuer die uebrigen Unterverzeichnisse, mit
+  Ausnahme von "lib" und "texmf", die lediglich - von mir so genannte -
+  "Bruecken"-Links zu den jeweiligen Unterverzeichnissen der Applikation
+  herstellen:
+
+      /opt/lib/foo-591    ->  ../packages/diverse/foo-591/lib
+      /opt/texmf/foo-591  ->  ../packages/diverse/foo-591/texmf
+
+  ("Bruecken" deshalb, weil ueber sie viele moegliche Verbindungen laufen,
+  und nicht nur eine eins-zu-eins-Verbindung zustande kommt. Man sagt auch
+  einfach "Directory-Links" dazu, da sie nicht auf eine Datei, sondern auf
+  ein Verzeichnis zeigen.)
+
+  Zur Erinnerung, der symbolische Link in /opt/pkg ist uebrigens ebenfalls
+  ein solcher "Bruecken"-Link:
+
+      /opt/pkg/foo-591    ->  ../packages/diverse/foo-591
+
+  Man beachte, dass GenOpt (wie hier angedeutet) stets _RELATIVE_ Links
+  verwendet, und nicht (wie weiter oben zwecks besseren Verstaendnisses
+  angegeben), _ABSOLUTE_, also stets "../packages/diverse/foo-591/..."
+  und nicht "/opt/packages/diverse/foo-591/...".
+
+  Dies macht ein spaeteres Verschieben der gesamten GenOpt-Hierarchie
+  innerhalb des Dateisystems moeglich.
+
+  Dazu muss lediglich nach dem Verschieben, zum Beispiel von /opt nach
+  /usr/local/opt, von Hand ein (einziger!) symbolischer Link wie folgt
+  (Beispiel!) eingerichtet werden:
+
+                      /opt -> /usr/local/opt
+
+
+  2.2.5 Verschieben eines Pakets
+
+  Das Verschieben eines Software-Pakets (zum Beispiel zur Einsortierung
+  in eine andere oder neue Unterkategorie) erfolgt in drei Schritten:
+
+  Im ersten Schritt werden zuerst alle bestehenden Links zur fraglichen
+  Applikation "gekappt":
+
+        % cd /opt/packages/diverse/foo-591
+        % genopt -r .
+
+  (Der Parameter "-r" steht dabei fuer "remove", "entferne" oder "loesche".)
+
+  Im zweiten Schritt wird die Applikation wie gewuenscht verschoben, zum
+  Beispiel
+
+        % cd /opt/packages
+        % mkdir tools
+        % mkdir tools/filter
+        % cd diverse
+        % mv foo-591 /opt/packages/tools/filter/
+
+  Im dritten und letzten Schritt werden die Links wieder "gezogen", im
+  gegebenen Beispiel mit:
+
+        % cd /opt/packages/tools/filter/foo-591
+        % genopt .
+
+  Fertig!
+
+  Man beachte, dass diese drei Schritte z.B. auch dann durchzufuehren
+  sind, falls man das Verzeichnis eines Softwarepakets nur umbenennt.
+
+  Das tritt z.B. dann auf, wenn man eine neuere Version desselben
+  Pakets installieren und die aeltere Installation noch nicht loeschen,
+  sondern einfach nur umbenennen moechte (z.B. durch Anhaengen der
+  Versionsnummer).
+
+
+  2.2.6 De-Installieren des Pakets
+
+  Die De-Installation eines Software-Pakets mit GenOpt ist verblueffend
+  einfach:
+
+        % cd /opt/packages/tools/filter/foo-591
+        % genopt -r .
+        % cd ..
+        % rm -rf foo-591
+
+  Das ist alles!
+
+  Alternativ kann man auch wie folgt vorgehen:
+
+        % cd /opt/packages/tools/filter/foo-591
+        % rm -rf *
+        % genopt .
+        % cd ..
+        % rmdir foo-591
+
+  Das erfordert jedoch einen Schritt mehr.
+
+  In diesem Fall braucht man die Option "-r" nicht anzugeben, da GenOpt
+  bei jedem Aufruf automatisch alle ueberfluessig gewordenen Links loescht
+  (diese Option hier mit anzugeben schadet aber auch nicht).
+
+
+  2.3 Hinweise
+
+  - Wenn man GenOpt ohne Parameter oder mit dem Parameter "-h" (fuer "Hilfe")
+    aufruft, gibt GenOpt eine kleine Anleitung (die Liste der moeglichen Auf-
+    rufparameter mit einer kurzen Erlaeuterung ueber ihren jeweiligen Zweck)
+    aus.
+
+  - Falls man von Hand etwas an den von GenOpt verwalteten symbolischen
+    Links oder Index-Dateien veraendert hat, oder aus Versehen etwas der-
+    artiges durch irgendein Werkzeug verursacht wurde, so genuegt in der
+    Regel ein nochmaliges Aufrufen von GenOpt im Verzeichnis der be-
+    troffenen Applikation, um etwaige Inkonsistenzen zu bereinigen.
+
+  - Falls dies nicht genuegt, kann man auch unbeschadet alle Verzeichnisse
+    von GenOpt, die ausschliesslich Links enthalten (also /opt/pkg, /opt/bin,
+    /opt/lib usw., jedoch natuerlich _NICHT_ /opt/packages!) sowie seine
+    saemtlichen Index-Dateien (/opt/.genopt.L.*) loeschen oder in ein Ver-
+    zeichnis ausserhalb der GenOpt-Hierarchie verschieben und dann saemtliche
+    symbolischen Links neu erzeugen.
+
+    (Fuer diesen rekursiven Abstieg durch alle Verzeichnisse mit dem Aufruf
+    von GenOpt fuer jedes einzelne davon gibt es ein kleines Tool namens
+    "mgenopt" im Unterverzeichnis "misc" dieser Distribution.)
+
+  - Manchmal passiert es, dass zwei unterschiedliche Applikationen Dateien
+    mit dem gleichen Namen haben, vor allem bei der parallelen Installation
+    von unterschiedlichen Versionen derselben Applikation.
+
+    Dadurch kann es zu Konflikten in den Verzeichnissen mit den symbolischen
+    Links kommen.
+
+    Standardmaessig meldet GenOpt in solch einem Fall einen Fehler und
+    laesst es hiermit bewenden, d.h. der fremde Link wird nicht veraendert
+    (und ein neuer Link mit demselben Namen also nicht angelegt).
+
+    Will man jedoch einer von den beiden Applikationen (z.B. der neueren
+    davon) den Vorrang geben, muss der alte Link entfernt und durch den
+    neuen ersetzt werden.
+
+    GenOpt bietet hierfuer die Option "-f" an (fuer "force", "erzwinge"),
+    mit der im selben Lauf von GenOpt zuerst der alte (fremde) Link entfernt
+    und gleich anschliessend der neue Link erstellt wird.
+
+    Bei allen Konflikten wird zudem immer (zur besseren Kontrolle) am
+    Bildschirm angezeigt, wohin der fremde Link zeigt.
+
+  - Man beachte, dass das Entdecken von Konflikten und die automatische
+    Behebung von Inkonsistenzen zwischen den tatsaechlich vorhandenen
+    symbolischen Links und den von GenOpt verwalteten Index-Dateien nur
+    noch teilweise funktioniert, wenn im GenOpt-Skript der "Fast"-Modus
+    aktiviert ist (Konstante "fast_mode" am Anfang des Skripts)!
+
+    Um ganz sicher zu gehen, sollte man bei aktiviertem "Fast"-Modus immer
+    zuerst alle Links (mit Hilfe der Option "-r") loeschen und anschliessend
+    wieder neu anlegen - damit ginge allerdings der mit diesem Modus ver-
+    bundene Geschwindigkeitsgewinn wieder verloren.
+
+    Der "Fast"-Modus beschleunigt im uebrigen nur das Ueberpruefen von
+    Links, das eigentliche Loeschen und Erzeugen von neuen Links bleibt
+    davon unberuehrt (im "Fast"-Modus wird den Index-Dateien "blind"
+    vertraut, um festzustellen, ob ein Link bereits existiert oder nicht.
+    Ohne den "Fast"-Modus wird das Datei-System ueberprueft, ob der be-
+    treffende Link tatsaechlich existiert.)
+
+  - Mit Hilfe des Parameters "-d" (dabei steht das "d" fuer "directory",
+    "Verzeichnis") laesst sich eine Liste von (durch Komma, jedoch ohne
+    Leerraum voneinander getrennten) Unterverzeichnissen angeben, auf die
+    sich die Aktionen von GenOpt dann beziehen, also z.B. die Liste der zu
+    erzeugenden Unterverzeichnisse bei der Verwendung der Option "-c", um
+    nicht unnoetig spaeter leerbleibende Unterverzeichnisse zu erzeugen.
+
+    Oder um gezielt nur die Links zu einem bestimmten Unterverzeichnis
+    erstellen oder ueberpruefen zu lassen, oder um bei der Verwendung
+    der Option "-f" zur Sicherheit die Wirkung auf bestimmte Unterver-
+    zeichnisse zu begrenzen, oder um nur die Links zu ganz bestimmten
+    Unterverzeichnissen zu entfernen.
+
+    Man beachte, dass die Option "-c" in dieser Hinsicht mehrere Sonder-
+    faelle beinhaltet:
+
+    Zum einen werden die Unterverzeichnisse "arc" und "bin" (als Minimal-
+    konfiguration) _IMMER_ erzeugt, unabhaengig davon, ob sie mit "-d"
+    angegeben wurden oder nicht.
+
+    Ausserdem werden bei der Erstellung der Unterverzeichnisse die
+    sogenannten "Bruecken"-Links fuer alle in der Liste angegebenen
+    "Bruecken"-Verzeichnisse gleich mit erzeugt, mindestens jedoch
+    fuer das "pkg"-Unterverzeichnis (wegen seiner herausragenden
+    Rolle fuer jede Applikation), unabhaengig davon, ob es in der
+    angegebenen Liste erscheint oder nicht.
+
+    (Wie sich das verhindern laesst, siehe weiter unten unter "Tips
+    & Tricks"!)
+
+    Man beachte ausserdem, dass die Option "-d" mehrfach auf der
+    Kommandozeile vorkommen darf; alle angegebenen Unterverzeichnisse
+    werden intern in einer einzigen Liste zusammengefasst, die dann
+    als Liste der zu bearbeitenden Unterverzeichnisse dient.
+
+    Es ist daher gleichwertig, ob man
+
+        % genopt -d bin -d man .
+
+    angibt oder
+
+        % genopt -d bin,man .
+
+  - Bei Optionen, denen ein Argument folgen muss ("-p", "-s" und "-d"),
+    kann dieses Argument wahlweise entweder direkt auf den Options-Buchstaben
+    folgen, oder durch Leerraum von diesem getrennt sein.
+
+  - Das Zusammenfassen von mehreren Optionen zu einem einzigen "Wort" (wie
+    z.B. in "-cdbin") ist nicht moeglich.
+
+  - Die Verdrahtung von /opt/lib/foo-591 anstelle von /opt/pkg/foo-591/lib
+    ist Geschmackssache und manchmal (z.B. bei GNU configure) nur schwer
+    einstellbar. Der Pfad /opt/lib/foo-591 ist der "elegantere", aber beide
+    funktionieren gleichermassen. Fazit: Wenn es geht, dann /opt/lib/foo-591
+    verwenden, wenn es nicht einfach geht, dann /opt/pkg/foo-591/lib (z.B.
+    durch ./configure --prefix=/opt/pkg/foo-591).
+
+  - Es soll nicht verschwiegen werden, dass obwohl GenOpt eine sehr elegante
+    und maechtige Loesung zur Installation von Unix-Software darstellt, nicht
+    alle moeglichen Anwendungsfaelle von GenOpt abgedeckt werden. Damit sind
+    vor allem Strukturen von imhomogenen Workstation-Clustern gemeint, die
+    per NFS ihre Software-Installationen verteilt benutzen wollen. GenOpt
+    bietet keine Unterstuetzung von Multi-Plattform- oder Multi-Architektur-
+    Installationen innerhalb einer GenOpt-Hierarchie.
+
+  - Es ist ausserdem nicht moeglich, bestimmte /opt/... Eintraege fuer
+    einzelne Maschinen getrennt generieren zu lassen, wie es z.B. in
+    folgender Situation auftritt: Auf der Maschine sunfi1 liegt der /opt-
+    Dateibaum. Hier gibt es z.B. das Software-Paket /opt/pkg/sendmail,
+    das Mail-Programm. Dieses benutzt Konfigurationsdateien, die es ueber
+    /opt/lib/sendmail anspricht. Die Maschine sunfi2 benutzt /opt ebenfalls,
+    und zwar ueber NFS, darf aber keine Mails erlauben, da sie zwar das
+    Programm /opt/bin/sendmail ausfuehren kann, dieses aber fuer eine andere
+    Maschine konfiguriert ist (Hostnamen, etc.), was zu Problemen fuehrt.
+    GenOpt muesste in so einem Falle aus einem gemeinsamen /opt/packages,
+    das ein /opt/pkg/sendmail/lib.sunfi1 _UND_ ein /opt/pkg/sendmail/lib.sunfi2
+    besitzt, _ZWEI_ (!) /opt-Hierarchien genieren: Eine fuer die sunfi1 (welche
+    /opt/pkg/sendmail/lib.sunfi1 als /opt/lib/sendmail bekommt) und eine fuer
+    die sunfi2 (welche /opt/pkg/sendmail/lib.sunfi2 als /opt/lib/sendmail be-
+    kommt). Dies ist aber mit GenOpt nicht moeglich.
+
+  - Es ist im GenOpt-Skript einkonfiguriert, welche Unterverzeichnisse
+    es kennt.
+
+    Neue, zusaetzliche Verzeichnisse lassen sich dort ganz leicht
+    einstellen.
+
+    Man muss nur darauf achten, ob es sich um ein Verzeichnis fuer die
+    sogenannten "Bruecken"-Links oder ein solches fuer eins-zu-eins-
+    Verbindungen handelt, und das Verzeichnis entsprechend in der
+    Variablen "BRIDGE_SUBDIRS" eintragen oder nicht.
+
+  - Unterverzeichnisse von /opt/man (z.B. /opt/man/man1) werden automatisch
+    von GenOpt erzeugt, wenn sie gebraucht werden.
+
+  - Dieses Dokument beschreibt GenOpt Version 2.1.0, die sich zum Teil
+    erheblich von den vorhergehenden Versionen von GenOpt unterscheidet,
+    da sie eine vollstaendige Neuentwicklung durch Steffen Beyer darstellt.
+
+
+  3. Resuemee des Autors Ralf S. Engelschall
+
+  GenOpt ist nun rund sechs Jahre alt und seit den ersten Stunden bei sd&m
+  (software design & management GmbH&Co.KG, mit Stammsitz in Muenchen) im
+  staendigen Einsatz. Mit GenOpt wurden und werden die dortigen Unix-Server
+  verwaltet. Auch an der TU Muenchen wurde GenOpt bereits eingesetzt, und
+  mittlerweile verrichtet GenOpt auch bei der Firma Zeppelin seinen Dienst.
+
+  Der Einsatz von GenOpt als Installations-Instrument fuer optionale Unix-
+  Software hat sich in der Praxis sehr bewaehrt, da es dadurch moeglich ist:
+
+  - als Administrator eine Uebersicht ueber alle Applikationen zu haben
+    und die Verwaltung ueber den ganzen Pool einem Werkzeug zu ueberlassen
+
+  - die De-Installation einer Applikation trivial ist:
+
+        % cd /opt/packages/diverse/foo-591
+        % genopt -r .
+        % cd ..
+        % rm -rf foo-591
+
+  - die Installation Spass macht, weil man sich nur Gedanken ueber die
+    Einordnung der Applikation in eine geeignete Kategorie (= ein geeignetes
+    Unterverzeichnis) machen muss und das Einhaengen der Applikation selbst
+    GenOpt ueberlassen kann.
+
+  Zusammenfassend muss man sagen, dass rund sechs Jahre Installationen mit
+  GenOpt ausgezeichnete Ergebnisse erzielt haben. Mit GenOpt war es ueber-
+  haupt erst moeglich, eine grosse Anzahl von Applikationen (im Bereich von
+  fast tausend Binaries!) zu verwalten.
+
+
+  4. Tips & Tricks
+
+  Wenn man die Option "-c" fuer "create" (erzeugen) gleichzeitig zusammen
+  mit der Option "-r" fuer "remove" (entfernen, d.h. loeschen) verwendet,
+  werden lediglich die angegebenen Unterverzeichnisse erzeugt, jedoch
+  keinerlei Links angelegt.
+
+
+
